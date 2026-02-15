@@ -9,7 +9,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.root}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
       <View style={styles.preview}>
         <ActiveScreen />
       </View>

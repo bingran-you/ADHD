@@ -1,0 +1,32 @@
+export const keepTheme = {
+  colors: {
+    gradientTop: '#4d436b',
+    gradientBottom: '#5a4b86',
+    textPrimary: '#ffffff',
+    textSecondary: 'rgba(255, 255, 255, 0.78)',
+    textMuted: 'rgba(255, 255, 255, 0.55)',
+    textDark: '#2f2938',
+    surface: 'rgba(255, 255, 255, 0.14)',
+    surfaceStrong: 'rgba(255, 255, 255, 0.22)',
+    surfaceSolid: '#ffffff',
+    divider: 'rgba(255, 255, 255, 0.18)',
+    green: '#6ed4a5',
+    greenDark: '#55c393',
+    radioBorder: 'rgba(0, 0, 0, 0.18)',
+    sheetText: '#2d2a34',
+    sheetMuted: '#7a7487',
+  },
+  spacing: {
+    xs: 6,
+    sm: 10,
+    md: 16,
+    lg: 24,
+    xl: 32,
+  },
+  radius: {
+    sm: 10,
+    md: 16,
+    lg: 24,
+    pill: 999,
+  },
+};
