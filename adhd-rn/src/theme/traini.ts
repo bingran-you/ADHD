@@ -1,0 +1,32 @@
+export const trainiTheme = {
+  colors: {
+    background: '#f7f4f1',
+    surface: '#ffffff',
+    surfaceMuted: '#f1eeea',
+    textPrimary: '#3c3936',
+    textSecondary: '#7b7671',
+    textMuted: '#a8a19b',
+    accent: '#ff6b6b',
+    accentSoft: '#ffd9d9',
+    border: '#e6e1db',
+    borderStrong: '#d9d4ce',
+    disabled: '#d7d3ce',
+    progressTrack: '#e3ded7',
+    overlay: 'rgba(0, 0, 0, 0.35)',
+    highlight: '#ffe9e4',
+  },
+  spacing: {
+    xs: 6,
+    sm: 10,
+    md: 16,
+    lg: 24,
+    xl: 32,
+    xxl: 40,
+  },
+  radius: {
+    sm: 8,
+    md: 14,
+    lg: 22,
+    pill: 999,
+  },
+};
