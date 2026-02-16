@@ -16,9 +16,11 @@ import CoachChip from './components/CoachChip';
 import CoachScreen from './components/CoachScreen';
 import CoachTabBar from './components/CoachTabBar';
 import { concernOptions, strategyLibrary, taskBank, triggerOptions, type ConcernKey, type Task } from './data';
+import { getLogsSince, saveDailyLog } from './storage';
 import { coachTheme } from './theme';
+import type { DailyLog, EventState, MetricKey, MetricsState } from './types';
 
-type TabKey = 'today' | 'log' | 'coach' | 'library' | 'profile';
+type TabKey = 'today' | 'log' | 'coach' | 'library' | 'trend' | 'profile';
 
 type Profile = {
   childName: string;
@@ -28,14 +30,13 @@ type Profile = {
   caregiver: string;
 };
 
-type MetricKey = 'attention' | 'mood' | 'transition' | 'parentCalm' | 'sleep';
-
-type MetricsState = Record<MetricKey, number>;
-
-type EventState = {
-  type: 'good' | 'hard';
-  triggers: string[];
-  note: string;
+type TrendSummary = {
+  date: string;
+  average: number;
+  hasData: boolean;
+  completedCount: number;
+  goodCount: number;
+  hardCount: number;
 };
 
 const initialProfile: Profile = {
@@ -57,12 +58,13 @@ const metricRows: Array<{ key: MetricKey; label: string; hint: string }> = [
 const timeOptions = ['5分钟', '10分钟', '20分钟', '30分钟'];
 const caregiverOptions = ['妈妈', '爸爸', '祖辈', '其他照护者'];
 
-const tabItems = [
-  { key: 'today', label: '今日', icon: '今' },
-  { key: 'log', label: '记录', icon: '记' },
-  { key: 'coach', label: '教练', icon: '导' },
-  { key: 'library', label: '方法', icon: '库' },
-  { key: 'profile', label: '我的', icon: '我' },
+const tabItems: Array<{ key: TabKey; label: string; icon: 'today' | 'log' | 'coach' | 'library' | 'trend' | 'profile' }> = [
+  { key: 'today', label: '今日', icon: 'today' },
+  { key: 'log', label: '记录', icon: 'log' },
+  { key: 'coach', label: '教练', icon: 'coach' },
+  { key: 'library', label: '方法', icon: 'library' },
+  { key: 'trend', label: '趋势', icon: 'trend' },
+  { key: 'profile', label: '我的', icon: 'profile' },
 ];
 
 function useEntrance(delay = 0) {
@@ -162,6 +164,56 @@ function formatDuration(seconds: number) {
     .toString()
     .padStart(2, '0');
   return `${mm}:${ss}`;
+}
+
+function toDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(date: Date, offset: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + offset);
+  return next;
+}
+
+function getWeekDateKeys(baseDate = new Date()) {
+  const start = addDays(baseDate, -6);
+  return Array.from({ length: 7 }, (_, index) => toDateKey(addDays(start, index)));
+}
+
+function buildTrendSummary(logs: DailyLog[], weekKeys: string[]): TrendSummary[] {
+  const map = new Map(logs.map((log) => [log.date, log]));
+  return weekKeys.map((date) => {
+    const log = map.get(date);
+    if (!log) {
+      return {
+        date,
+        average: 0,
+        hasData: false,
+        completedCount: 0,
+        goodCount: 0,
+        hardCount: 0,
+      };
+    }
+    const average =
+      (log.metrics.attention +
+        log.metrics.mood +
+        log.metrics.transition +
+        log.metrics.parentCalm +
+        log.metrics.sleep) /
+      5;
+    return {
+      date,
+      average,
+      hasData: true,
+      completedCount: log.completedTasks.length,
+      goodCount: log.event.type === 'good' ? 1 : 0,
+      hardCount: log.event.type === 'hard' ? 1 : 0,
+    };
+  });
 }
 
 function buildTodayTasks(profile: Profile): Task[] {
@@ -330,6 +382,8 @@ export default function CoachApp() {
   const [onboarded, setOnboarded] = useState(false);
   const [profile, setProfile] = useState<Profile>(initialProfile);
   const [completedTasks, setCompletedTasks] = useState<string[]>([]);
+  const [weeklyLogs, setWeeklyLogs] = useState<DailyLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(true);
   const [metrics, setMetrics] = useState<MetricsState>({
     attention: 3,
     mood: 3,
@@ -344,6 +398,30 @@ export default function CoachApp() {
   });
 
   const todayTasks = useMemo(() => buildTodayTasks(profile), [profile]);
+  const weekKeys = useMemo(() => getWeekDateKeys(), []);
+
+  const refreshWeeklyLogs = async () => {
+    setLogsLoading(true);
+    const logs = await getLogsSince(weekKeys[0]);
+    setWeeklyLogs(logs);
+    setLogsLoading(false);
+  };
+
+  useEffect(() => {
+    void refreshWeeklyLogs();
+  }, []);
+
+  const handleSaveLog = async () => {
+    const log: DailyLog = {
+      date: toDateKey(new Date()),
+      metrics,
+      event: eventState,
+      completedTasks,
+      createdAt: Date.now(),
+    };
+    await saveDailyLog(log);
+    await refreshWeeklyLogs();
+  };
 
   if (!onboarded) {
     return <OnboardingScreen profile={profile} onComplete={(data) => {
@@ -378,6 +456,8 @@ export default function CoachApp() {
               }
               eventState={eventState}
               onEventChange={setEventState}
+              completedTasks={completedTasks}
+              onSave={handleSaveLog}
             />
           )}
           {activeTab === 'coach' && (
@@ -388,6 +468,9 @@ export default function CoachApp() {
             />
           )}
           {activeTab === 'library' && <LibraryTab />}
+          {activeTab === 'trend' && (
+            <TrendTab logs={weeklyLogs} weekKeys={weekKeys} loading={logsLoading} />
+          )}
           {activeTab === 'profile' && <ProfileTab profile={profile} />}
         </View>
         <CoachTabBar
@@ -615,19 +698,25 @@ type LogTabProps = {
   onMetricChange: (key: MetricKey, value: number) => void;
   eventState: EventState;
   onEventChange: (state: EventState) => void;
+  completedTasks: string[];
+  onSave: () => Promise<void>;
 };
 
-function LogTab({ metrics, onMetricChange, eventState, onEventChange }: LogTabProps) {
+function LogTab({ metrics, onMetricChange, eventState, onEventChange, completedTasks, onSave }: LogTabProps) {
   const entrance = useEntrance(80);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave();
     const now = new Date();
     const stamp = `${now.getHours().toString().padStart(2, '0')}:${now
       .getMinutes()
       .toString()
       .padStart(2, '0')}`;
     setSavedAt(stamp);
+    setSaving(false);
   };
 
   return (
@@ -639,6 +728,7 @@ function LogTab({ metrics, onMetricChange, eventState, onEventChange }: LogTabPr
 
       <Card>
         <SectionTitle title="每日评估" subtitle="1 很差 · 5 很好" />
+        <Text style={styles.metricSummary}>今日任务完成：{completedTasks.length} 项</Text>
         <View style={styles.metricList}>
           {metricRows.map((row) => (
             <MetricRow
@@ -708,7 +798,7 @@ function LogTab({ metrics, onMetricChange, eventState, onEventChange }: LogTabPr
         />
 
         <View style={styles.saveRow}>
-          <CoachButton label="保存记录" onPress={handleSave} style={styles.saveButton} />
+          <CoachButton label={saving ? '保存中...' : '保存记录'} onPress={handleSave} style={styles.saveButton} />
           {savedAt ? <Text style={styles.savedText}>已保存 {savedAt}</Text> : null}
         </View>
       </Card>
@@ -834,6 +924,89 @@ function LibraryTab() {
           </View>
         </Card>
       ))}
+    </ScrollView>
+  );
+}
+
+type TrendTabProps = {
+  logs: DailyLog[];
+  weekKeys: string[];
+  loading: boolean;
+};
+
+function TrendTab({ logs, weekKeys, loading }: TrendTabProps) {
+  const entrance = useEntrance(80);
+  const summary = useMemo(() => buildTrendSummary(logs, weekKeys), [logs, weekKeys]);
+  const dataPoints = summary.filter((item) => item.hasData);
+  const averageScore =
+    dataPoints.reduce((acc, item) => acc + item.average, 0) / (dataPoints.length || 1);
+  const completedAverage =
+    dataPoints.reduce((acc, item) => acc + item.completedCount, 0) / (dataPoints.length || 1);
+  const goodCount = summary.reduce((acc, item) => acc + item.goodCount, 0);
+  const hardCount = summary.reduce((acc, item) => acc + item.hardCount, 0);
+
+  return (
+    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <Animated.View style={[entrance]}>
+        <Text style={styles.heroTitle}>周报 / 趋势</Text>
+        <Text style={styles.heroSubtitle}>每周回顾 7 天的数据趋势。</Text>
+      </Animated.View>
+
+      {loading ? (
+        <Card>
+          <Text style={styles.trendEmpty}>正在加载数据...</Text>
+        </Card>
+      ) : (
+        <>
+          <Card>
+            <SectionTitle title="本周概览" subtitle="平均值基于已记录天数" />
+            <View style={styles.trendSummaryRow}>
+              <View style={styles.trendSummaryItem}>
+                <Text style={styles.trendSummaryLabel}>稳定度</Text>
+                <Text style={styles.trendSummaryValue}>{averageScore.toFixed(1)}</Text>
+              </View>
+              <View style={styles.trendSummaryItem}>
+                <Text style={styles.trendSummaryLabel}>任务完成</Text>
+                <Text style={styles.trendSummaryValue}>{completedAverage.toFixed(1)} / 天</Text>
+              </View>
+              <View style={styles.trendSummaryItem}>
+                <Text style={styles.trendSummaryLabel}>美好时光</Text>
+                <Text style={styles.trendSummaryValue}>{goodCount}</Text>
+              </View>
+              <View style={styles.trendSummaryItem}>
+                <Text style={styles.trendSummaryLabel}>艰难时光</Text>
+                <Text style={styles.trendSummaryValue}>{hardCount}</Text>
+              </View>
+            </View>
+          </Card>
+
+          <Card>
+            <SectionTitle title="稳定度趋势" subtitle="每日平均 1-5 分" />
+            {dataPoints.length === 0 ? (
+              <Text style={styles.trendEmpty}>本周还没有记录，从今天开始吧。</Text>
+            ) : (
+              <View style={styles.trendChart}>
+                {summary.map((item) => {
+                  const height = item.hasData ? Math.max(8, (item.average / 5) * 90) : 6;
+                  return (
+                    <View key={item.date} style={styles.trendBarItem}>
+                      <View style={[styles.trendBar, item.hasData && styles.trendBarActive, { height }]} />
+                      <Text style={styles.trendBarLabel}>{item.date.slice(5)}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </Card>
+
+          <Card>
+            <SectionTitle title="建议" />
+            <Text style={styles.trendHint}>
+              若平均稳定度低于 3，优先保证“倒计时过渡 + 安静时间 + 短句指令”。稳定度连续 3 天高于 4，可适当增加任务难度。
+            </Text>
+          </Card>
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -1075,6 +1248,12 @@ const styles = StyleSheet.create({
   metricList: {
     gap: coachTheme.spacing.md,
   },
+  metricSummary: {
+    fontSize: 12,
+    color: coachTheme.colors.textSecondary,
+    marginBottom: 6,
+    fontFamily: coachTheme.fonts.body,
+  },
   metricRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1294,6 +1473,66 @@ const styles = StyleSheet.create({
     color: coachTheme.colors.textSecondary,
     fontFamily: coachTheme.fonts.body,
     marginTop: 4,
+  },
+  trendSummaryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  trendSummaryItem: {
+    width: '45%',
+    backgroundColor: coachTheme.colors.surfaceCool,
+    borderRadius: coachTheme.radius.md,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: coachTheme.colors.border,
+  },
+  trendSummaryLabel: {
+    fontSize: 11,
+    color: coachTheme.colors.textMuted,
+    fontFamily: coachTheme.fonts.body,
+  },
+  trendSummaryValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: coachTheme.colors.textPrimary,
+    fontFamily: coachTheme.fonts.heading,
+    marginTop: 4,
+  },
+  trendChart: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginTop: 12,
+  },
+  trendBarItem: {
+    alignItems: 'center',
+    width: 36,
+    gap: 6,
+  },
+  trendBar: {
+    width: 12,
+    borderRadius: 6,
+    backgroundColor: coachTheme.colors.border,
+  },
+  trendBarActive: {
+    backgroundColor: coachTheme.colors.accent,
+  },
+  trendBarLabel: {
+    fontSize: 10,
+    color: coachTheme.colors.textMuted,
+    fontFamily: coachTheme.fonts.body,
+  },
+  trendEmpty: {
+    fontSize: 12,
+    color: coachTheme.colors.textMuted,
+    fontFamily: coachTheme.fonts.body,
+  },
+  trendHint: {
+    fontSize: 12,
+    color: coachTheme.colors.textSecondary,
+    fontFamily: coachTheme.fonts.body,
+    lineHeight: 18,
   },
   profileCard: {
     gap: coachTheme.spacing.sm,
