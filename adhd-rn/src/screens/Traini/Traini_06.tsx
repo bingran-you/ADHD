@@ -25,8 +25,7 @@ export default function Traini_06() {
           left={<View style={styles.backCircle}><Text style={styles.back}>{'<'}</Text></View>}
           center={<TrainiLogo />}
         />
-        <Text style={styles.title}>Pick br&apos;s best{'
-'}photos for his profile!</Text>
+        <Text style={styles.title}>Pick br&apos;s best{"\n"}photos for his profile!</Text>
         <Text style={styles.subtitle}>
           Start with one photo to continue. You can add more anytime.
         </Text>

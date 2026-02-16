@@ -24,8 +24,7 @@ export default function Traini_11() {
           </View>
           <Text style={styles.overline}>INTRODUCING</Text>
           <Text style={styles.title}>Traini Collar</Text>
-          <Text style={styles.subtitle}>Talk. Health. GPS Tracking.{'
-'}Made to understand your dog.</Text>
+          <Text style={styles.subtitle}>Talk. Health. GPS Tracking.{"\n"}Made to understand your dog.</Text>
           <View style={styles.primaryButton}>
             <Text style={styles.primaryText}>Pre-Order Now</Text>
           </View>
