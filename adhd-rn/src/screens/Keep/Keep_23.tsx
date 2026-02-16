@@ -10,7 +10,7 @@ export default function Keep_23() {
       <View style={styles.container}>
         <Text style={styles.back}>&lt;</Text>
         <View style={styles.header}>
-          <Text style={styles.label}>AI 教练·卡卡</Text>
+          <Text style={styles.label}>AI 医生·卡卡</Text>
           <Text style={styles.title}>你想提升的部位是?</Text>
           <Text style={styles.subtitle}>可多选, 最多可选 3 项</Text>
         </View>

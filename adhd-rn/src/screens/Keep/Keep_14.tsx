@@ -14,7 +14,7 @@ export default function Keep_14() {
       <KeepBottomSheet style={styles.sheet}>
         <View style={styles.header}>
           <View style={styles.aiDot} />
-          <Text style={styles.sheetLabel}>AI 教练·卡卡</Text>
+          <Text style={styles.sheetLabel}>AI 医生·卡卡</Text>
         </View>
         <Text style={styles.title}>提醒自己定时运动吧!</Text>
         <View style={styles.list}>

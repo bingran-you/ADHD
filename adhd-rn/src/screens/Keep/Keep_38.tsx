@@ -49,7 +49,7 @@ export default function Keep_38() {
         </View>
 
         <View style={styles.searchBar}>
-          <Text style={styles.searchPlaceholder}>询问 AI 教练</Text>
+          <Text style={styles.searchPlaceholder}>询问 AI 医生</Text>
           <View style={styles.plus}>
             <Text style={styles.plusText}>+</Text>
           </View>

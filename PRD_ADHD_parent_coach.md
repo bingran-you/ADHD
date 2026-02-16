@@ -59,7 +59,7 @@
 - 输入极简化：选择 + 评分 + 选填文字。
 - 记录字段：已在 `ADHD_assessment_items.md` 定义。
 
-### 7.4 AI 教练
+### 7.4 AI 医生
 - 输出类型：
   - 当日总结
   - 触发点识别
@@ -79,7 +79,7 @@
 ## 8. 信息架构（MVP）
 - 首页：今日任务
 - 记录：评估+事件
-- 教练：AI 复盘
+- 医生：AI 复盘
 - 方法库
 - 我的：家庭与设置
 
@@ -120,4 +120,3 @@
 ## 14. 依赖与假设
 - 已有评估指标体系：`/Users/bingran_you/Documents/GitHub_MacBook/ADHD/ADHD_assessment_items.md`
 - 内容来源可使用现有手册。
-

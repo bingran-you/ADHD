@@ -28,6 +28,33 @@ npm run android
 npm run web
 ```
 
+## E2E 测试（Maestro）
+> 需要已安装 Maestro CLI（依赖 Java 17+），并在模拟器/真机上安装 app（bundle id: `com.adhd.parentcoach`）。
+
+```bash
+cd /Users/bingran_you/Documents/GitHub_MacBook/ADHD/adhd-rn
+maestro test maestro/smoke.yaml
+```
+
+### iOS 安装 + 测试流程
+1. 启动模拟器（若未启动）
+```bash
+open -a Simulator
+```
+
+2. 安装应用到 iOS 模拟器（生成 Dev Client）
+```bash
+cd /Users/bingran_you/Documents/GitHub_MacBook/ADHD/adhd-rn
+npx expo run:ios
+```
+
+3. 运行 Maestro（确保 Java 17+）
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+export PATH="$JAVA_HOME/bin:$HOME/.maestro/bin:$PATH"
+maestro test maestro/smoke.yaml
+```
+
 ## 配置信息（当前）
 ### Expo (`adhd-rn/app.json`)
 - `name`: `adhd-rn`

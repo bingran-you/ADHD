@@ -2,16 +2,21 @@ export type MetricKey = 'attention' | 'mood' | 'transition' | 'parentCalm' | 'sl
 
 export type MetricsState = Record<MetricKey, number>;
 
-export type EventState = {
+export type EventDraft = {
   type: 'good' | 'hard';
   triggers: string[];
   note: string;
 };
 
+export type EventEntry = EventDraft & {
+  id: string;
+  createdAt: number;
+};
+
 export type DailyLog = {
   date: string;
   metrics: MetricsState;
-  event: EventState;
+  events: EventEntry[];
   completedTasks: string[];
   createdAt: number;
 };
