@@ -45,7 +45,7 @@ npm run web
 
 ### 脚本 (`adhd-rn/package.json`)
 - `npm run start` → `expo start`
-- `npm run ios` → `expo start --ios`
+- `npm run ios` → `expo start --ios --port 8082`
 - `npm run android` → `expo start --android`
 - `npm run web` → `expo start --web`
 
@@ -54,6 +54,29 @@ npm run web
 - `compilerOptions.strict: true`
 
 ## 常见问题与排查
+### 0. 如何启动 iOS Simulator（第一次）
+```bash
+# 打开 Simulator 应用
+open -a Simulator
+```
+
+如果 Simulator 中没有设备/运行时（会报 `No iOS devices available`），执行：
+```bash
+# 安装 iOS Simulator 运行时
+xcodebuild -downloadPlatform iOS
+
+# 创建并启动一个设备（如 iPhone 16）
+xcrun simctl create "iPhone 16" com.apple.CoreSimulator.SimDeviceType.iPhone-16 com.apple.CoreSimulator.SimRuntime.iOS-26-2
+open -a Simulator
+xcrun simctl boot "iPhone 16"
+```
+
+然后再运行：
+```bash
+cd /Users/bingran_you/Documents/GitHub_MacBook/ADHD/adhd-rn
+npm run ios
+```
+
 ### 1. `npm run ios` 提示端口被占用
 Expo 默认使用 `8081`。如果端口被其他进程占用，CLI 会询问是否切换端口；在非交互模式下会直接报错。
 
