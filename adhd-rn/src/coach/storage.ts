@@ -19,6 +19,11 @@ async function getDatabase() {
         completed TEXT NOT NULL,
         created_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS app_state (
+        key TEXT PRIMARY KEY NOT NULL,
+        value TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
     `);
     initialized = true;
   }
@@ -66,4 +71,34 @@ export async function getLogsSince(startDate: string): Promise<DailyLog[]> {
     completedTasks: JSON.parse(row.completed) as string[],
     createdAt: row.created_at,
   }));
+}
+
+type AppStateRow = {
+  value: string;
+};
+
+export async function setAppState<T>(key: string, value: T) {
+  const db = await getDatabase();
+  await db.runAsync(
+    `INSERT INTO app_state (key, value, updated_at)
+     VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET
+       value=excluded.value,
+       updated_at=excluded.updated_at;`,
+    [key, JSON.stringify(value), Date.now()]
+  );
+}
+
+export async function getAppState<T>(key: string): Promise<T | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<AppStateRow>('SELECT value FROM app_state WHERE key = ? LIMIT 1', [
+    key,
+  ]);
+  if (!row?.value) return null;
+  try {
+    return JSON.parse(row.value) as T;
+  } catch (error) {
+    console.warn('[storage] Failed to parse app_state', key, error);
+    return null;
+  }
 }

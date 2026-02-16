@@ -24,6 +24,7 @@ export default function CoachTabBar({ items, activeKey, onChange }: CoachTabBarP
           <Pressable
             key={item.key}
             onPress={() => onChange(item.key)}
+            testID={`tab-${item.key}`}
             style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
           >
             <View style={[styles.iconCircle, active && styles.iconCircleActive]}>

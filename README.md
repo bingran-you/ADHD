@@ -28,6 +28,36 @@ npm run android
 npm run web
 ```
 
+## 端到端测试（Detox，iOS）
+### 前置条件
+- macOS + Xcode + iOS Simulator
+- 安装 AppleSimulatorUtils（Detox 依赖）
+
+```bash
+brew tap wix/brew
+brew install applesimutils
+```
+
+### 安装依赖
+```bash
+cd /Users/bingran_you/Documents/GitHub_MacBook/ADHD/adhd-rn
+npm install
+npx pod-install
+```
+
+### 构建与运行
+```bash
+# 构建 iOS Detox App
+npm run e2e:build
+
+# 运行 E2E 测试
+npm run e2e:test
+```
+
+### 说明
+- 默认使用 `.detoxrc.js` 中的模拟器（`iPhone 15`）。如你的环境没有该设备，请在 `.detoxrc.js` 里替换为已安装的 Simulator。
+- 当前仅配置 iOS，Android E2E 尚未接入。
+
 ## 配置信息（当前）
 ### Expo (`adhd-rn/app.json`)
 - `name`: `adhd-rn`

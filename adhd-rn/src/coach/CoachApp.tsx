@@ -16,7 +16,7 @@ import CoachChip from './components/CoachChip';
 import CoachScreen from './components/CoachScreen';
 import CoachTabBar from './components/CoachTabBar';
 import { concernOptions, strategyLibrary, taskBank, triggerOptions, type ConcernKey, type Task } from './data';
-import { getLogsSince, saveDailyLog } from './storage';
+import { getAppState, getLogsSince, saveDailyLog, setAppState } from './storage';
 import { coachTheme } from './theme';
 import type { DailyLog, EventState, MetricKey, MetricsState } from './types';
 
@@ -47,6 +47,27 @@ const initialProfile: Profile = {
   caregiver: '妈妈',
 };
 
+const createDefaultMetrics = (): MetricsState => ({
+  attention: 3,
+  mood: 3,
+  transition: 3,
+  parentCalm: 3,
+  sleep: 3,
+});
+
+const createDefaultEventState = (): EventState => ({
+  type: 'good',
+  triggers: [],
+  note: '',
+});
+
+type SavedTodayState = {
+  date: string;
+  metrics: MetricsState;
+  event: EventState;
+  completedTasks: string[];
+};
+
 const metricRows: Array<{ key: MetricKey; label: string; hint: string }> = [
   { key: 'attention', label: '注意力持续', hint: '完成任务时的专注程度' },
   { key: 'mood', label: '情绪稳定', hint: '当天情绪起伏情况' },
@@ -55,6 +76,7 @@ const metricRows: Array<{ key: MetricKey; label: string; hint: string }> = [
   { key: 'sleep', label: '作息质量', hint: '入睡与夜间稳定' },
 ];
 
+const ageOptions = ['3-5岁', '6-8岁', '9-12岁', '13岁以上'];
 const timeOptions = ['5分钟', '10分钟', '20分钟', '30分钟'];
 const caregiverOptions = ['妈妈', '爸爸', '祖辈', '其他照护者'];
 
@@ -379,37 +401,98 @@ function MetricRow({ label, hint, value, onChange }: MetricRowProps) {
 
 export default function CoachApp() {
   const [activeTab, setActiveTab] = useState<TabKey>('today');
+  const [appLoading, setAppLoading] = useState(true);
+  const [appLoadError, setAppLoadError] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
   const [onboarded, setOnboarded] = useState(false);
   const [profile, setProfile] = useState<Profile>(initialProfile);
   const [completedTasks, setCompletedTasks] = useState<string[]>([]);
   const [weeklyLogs, setWeeklyLogs] = useState<DailyLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
-  const [metrics, setMetrics] = useState<MetricsState>({
-    attention: 3,
-    mood: 3,
-    transition: 3,
-    parentCalm: 3,
-    sleep: 3,
-  });
-  const [eventState, setEventState] = useState<EventState>({
-    type: 'good',
-    triggers: [],
-    note: '',
-  });
+  const [logsError, setLogsError] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState<MetricsState>(createDefaultMetrics);
+  const [eventState, setEventState] = useState<EventState>(createDefaultEventState);
 
   const todayTasks = useMemo(() => buildTodayTasks(profile), [profile]);
   const weekKeys = useMemo(() => getWeekDateKeys(), []);
 
+  useEffect(() => {
+    let active = true;
+    const hydrate = async () => {
+      setAppLoading(true);
+      setAppLoadError(null);
+      try {
+        const [savedProfile, savedOnboarded, savedToday] = await Promise.all([
+          getAppState<Profile>('profile'),
+          getAppState<boolean>('onboarded'),
+          getAppState<SavedTodayState>('today_state'),
+        ]);
+        if (!active) return;
+        if (savedProfile) setProfile(savedProfile);
+        if (typeof savedOnboarded === 'boolean') setOnboarded(savedOnboarded);
+        const todayKey = toDateKey(new Date());
+        if (savedToday && savedToday.date === todayKey) {
+          setMetrics(savedToday.metrics);
+          setEventState(savedToday.event);
+          setCompletedTasks(savedToday.completedTasks);
+        } else {
+          setMetrics(createDefaultMetrics());
+          setEventState(createDefaultEventState());
+          setCompletedTasks([]);
+        }
+        setHydrated(true);
+      } catch (error) {
+        console.warn('[CoachApp] Failed to hydrate app state', error);
+        if (active) setAppLoadError('数据加载失败，请重试');
+      } finally {
+        if (active) setAppLoading(false);
+      }
+    };
+    void hydrate();
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
+
   const refreshWeeklyLogs = async () => {
     setLogsLoading(true);
-    const logs = await getLogsSince(weekKeys[0]);
-    setWeeklyLogs(logs);
-    setLogsLoading(false);
+    setLogsError(null);
+    try {
+      const logs = await getLogsSince(weekKeys[0]);
+      setWeeklyLogs(logs);
+    } catch (error) {
+      console.warn('[CoachApp] Failed to load weekly logs', error);
+      setLogsError('加载趋势数据失败，请稍后重试。');
+    } finally {
+      setLogsLoading(false);
+    }
   };
 
   useEffect(() => {
     void refreshWeeklyLogs();
-  }, []);
+  }, [weekKeys]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    void setAppState('profile', profile);
+  }, [profile, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    void setAppState('onboarded', onboarded);
+  }, [onboarded, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const payload: SavedTodayState = {
+      date: toDateKey(new Date()),
+      metrics,
+      event: eventState,
+      completedTasks,
+    };
+    void setAppState('today_state', payload);
+  }, [completedTasks, eventState, hydrated, metrics]);
 
   const handleSaveLog = async () => {
     const log: DailyLog = {
@@ -422,6 +505,29 @@ export default function CoachApp() {
     await saveDailyLog(log);
     await refreshWeeklyLogs();
   };
+
+  if (appLoading) {
+    return (
+      <CoachScreen>
+        <View style={styles.loadingState}>
+          <Text style={styles.loadingTitle}>正在加载数据...</Text>
+          <Text style={styles.loadingHint}>请稍候，正在同步你的今日计划。</Text>
+        </View>
+      </CoachScreen>
+    );
+  }
+
+  if (appLoadError) {
+    return (
+      <CoachScreen>
+        <View style={styles.loadingState}>
+          <Text style={styles.loadingTitle}>数据加载失败</Text>
+          <Text style={styles.errorText}>{appLoadError}</Text>
+          <CoachButton label="重试" onPress={() => setReloadToken((value) => value + 1)} />
+        </View>
+      </CoachScreen>
+    );
+  }
 
   if (!onboarded) {
     return <OnboardingScreen profile={profile} onComplete={(data) => {
@@ -469,7 +575,7 @@ export default function CoachApp() {
           )}
           {activeTab === 'library' && <LibraryTab />}
           {activeTab === 'trend' && (
-            <TrendTab logs={weeklyLogs} weekKeys={weekKeys} loading={logsLoading} />
+            <TrendTab logs={weeklyLogs} weekKeys={weekKeys} loading={logsLoading} error={logsError} />
           )}
           {activeTab === 'profile' && <ProfileTab profile={profile} />}
         </View>
@@ -532,16 +638,18 @@ function OnboardingScreen({ profile, onComplete }: OnboardingScreenProps) {
                 placeholder="比如：小安"
                 placeholderTextColor={coachTheme.colors.textMuted}
                 style={styles.textInput}
+                testID="onboarding-child-name"
               />
               <Text style={styles.stepTitle}>年龄段</Text>
               <View style={styles.optionGrid}>
-                {['3-5岁', '6-8岁', '9-12岁', '13岁以上'].map((option) => (
+                {ageOptions.map((option, index) => (
                   <CoachChip
                     key={option}
                     label={option}
                     selected={draft.ageRange === option}
                     onPress={() => setDraft((current) => ({ ...current, ageRange: option }))}
                     style={styles.optionChip}
+                    testID={`onboarding-age-${index}`}
                   />
                 ))}
               </View>
@@ -567,6 +675,7 @@ function OnboardingScreen({ profile, onComplete }: OnboardingScreenProps) {
                               : [...current.concerns, option.key],
                           }))
                         }
+                        testID={`onboarding-concern-${option.key}`}
                       />
                       <Text style={styles.optionHint}>{option.hint}</Text>
                     </View>
@@ -580,25 +689,27 @@ function OnboardingScreen({ profile, onComplete }: OnboardingScreenProps) {
             <View style={styles.stepCard}>
               <Text style={styles.stepTitle}>每天可投入时间</Text>
               <View style={styles.optionGrid}>
-                {timeOptions.map((option) => (
+                {timeOptions.map((option, index) => (
                   <CoachChip
                     key={option}
                     label={option}
                     selected={draft.timeBudget === option}
                     onPress={() => setDraft((current) => ({ ...current, timeBudget: option }))}
                     style={styles.optionChip}
+                    testID={`onboarding-time-${index}`}
                   />
                 ))}
               </View>
               <Text style={styles.stepTitle}>主要照护者</Text>
               <View style={styles.optionGrid}>
-                {caregiverOptions.map((option) => (
+                {caregiverOptions.map((option, index) => (
                   <CoachChip
                     key={option}
                     label={option}
                     selected={draft.caregiver === option}
                     onPress={() => setDraft((current) => ({ ...current, caregiver: option }))}
                     style={styles.optionChip}
+                    testID={`onboarding-caregiver-${index}`}
                   />
                 ))}
               </View>
@@ -611,9 +722,10 @@ function OnboardingScreen({ profile, onComplete }: OnboardingScreenProps) {
             label={step < 2 ? '下一步' : '生成起始计划'}
             onPress={handleNext}
             disabled={!canNext}
+            testID="onboarding-next"
           />
           {step > 0 ? (
-            <Pressable onPress={() => setStep(step - 1)} style={styles.backLink}>
+            <Pressable onPress={() => setStep(step - 1)} style={styles.backLink} testID="onboarding-back">
               <Text style={styles.backLinkText}>返回上一步</Text>
             </Pressable>
           ) : null}
@@ -639,7 +751,11 @@ function TodayTab({ profile, tasks, completedTasks, onToggleTask, onQuickLog, on
   const timer = useCountdown(timedTask?.durationSec ?? 600);
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+      testID="log-scroll"
+    >
       <Animated.View style={[entrance]}>
         <Text style={styles.greeting}>早上好，{profile.caregiver}</Text>
         <Text style={styles.heroTitle}>今天只做 3 件小事</Text>
@@ -685,7 +801,12 @@ function TodayTab({ profile, tasks, completedTasks, onToggleTask, onQuickLog, on
         <Text style={styles.quickTitle}>快速入口</Text>
         <Text style={styles.quickHint}>只要 30 秒，记录今天的关键时刻。</Text>
         <View style={styles.quickButtons}>
-          <CoachButton label="去记录" onPress={onQuickLog} style={styles.quickButton} />
+          <CoachButton
+            label="去记录"
+            onPress={onQuickLog}
+            style={styles.quickButton}
+            testID="quick-log"
+          />
           <CoachButton label="求助教练" variant="outline" onPress={onAskCoach} />
         </View>
       </Card>
@@ -706,21 +827,33 @@ function LogTab({ metrics, onMetricChange, eventState, onEventChange, completedT
   const entrance = useEntrance(80);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleSave = async () => {
     setSaving(true);
-    await onSave();
-    const now = new Date();
-    const stamp = `${now.getHours().toString().padStart(2, '0')}:${now
-      .getMinutes()
-      .toString()
-      .padStart(2, '0')}`;
-    setSavedAt(stamp);
-    setSaving(false);
+    setSaveError(null);
+    try {
+      await onSave();
+      const now = new Date();
+      const stamp = `${now.getHours().toString().padStart(2, '0')}:${now
+        .getMinutes()
+        .toString()
+        .padStart(2, '0')}`;
+      setSavedAt(stamp);
+    } catch (error) {
+      console.warn('[LogTab] Failed to save log', error);
+      setSaveError('保存失败，请稍后重试。');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+      testID="today-scroll"
+    >
       <Animated.View style={[entrance]}>
         <Text style={styles.heroTitle}>每日记录</Text>
         <Text style={styles.heroSubtitle}>越简化越容易坚持，今天先抓 5 个指标。</Text>
@@ -798,9 +931,20 @@ function LogTab({ metrics, onMetricChange, eventState, onEventChange, completedT
         />
 
         <View style={styles.saveRow}>
-          <CoachButton label={saving ? '保存中...' : '保存记录'} onPress={handleSave} style={styles.saveButton} />
-          {savedAt ? <Text style={styles.savedText}>已保存 {savedAt}</Text> : null}
+          <CoachButton
+            label={saving ? '保存中...' : '保存记录'}
+            onPress={handleSave}
+            style={styles.saveButton}
+            disabled={saving}
+            testID="log-save"
+          />
+          {savedAt ? (
+            <Text style={styles.savedText} testID="log-saved-at">
+              已保存 {savedAt}
+            </Text>
+          ) : null}
         </View>
+        {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
       </Card>
     </ScrollView>
   );
@@ -932,9 +1076,10 @@ type TrendTabProps = {
   logs: DailyLog[];
   weekKeys: string[];
   loading: boolean;
+  error?: string | null;
 };
 
-function TrendTab({ logs, weekKeys, loading }: TrendTabProps) {
+function TrendTab({ logs, weekKeys, loading, error }: TrendTabProps) {
   const entrance = useEntrance(80);
   const summary = useMemo(() => buildTrendSummary(logs, weekKeys), [logs, weekKeys]);
   const dataPoints = summary.filter((item) => item.hasData);
@@ -948,13 +1093,19 @@ function TrendTab({ logs, weekKeys, loading }: TrendTabProps) {
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       <Animated.View style={[entrance]}>
-        <Text style={styles.heroTitle}>周报 / 趋势</Text>
+        <Text style={styles.heroTitle} testID="trend-title">
+          周报 / 趋势
+        </Text>
         <Text style={styles.heroSubtitle}>每周回顾 7 天的数据趋势。</Text>
       </Animated.View>
 
       {loading ? (
         <Card>
           <Text style={styles.trendEmpty}>正在加载数据...</Text>
+        </Card>
+      ) : error ? (
+        <Card>
+          <Text style={styles.errorText}>{error}</Text>
         </Card>
       ) : (
         <>
@@ -1071,6 +1222,32 @@ const styles = StyleSheet.create({
   },
   tabContent: {
     flex: 1,
+  },
+  loadingState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: coachTheme.spacing.lg,
+    gap: coachTheme.spacing.sm,
+  },
+  loadingTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: coachTheme.colors.textPrimary,
+    fontFamily: coachTheme.fonts.heading,
+  },
+  loadingHint: {
+    fontSize: 13,
+    color: coachTheme.colors.textMuted,
+    textAlign: 'center',
+    fontFamily: coachTheme.fonts.body,
+    lineHeight: 18,
+  },
+  errorText: {
+    fontSize: 13,
+    color: coachTheme.colors.accentDeep,
+    fontFamily: coachTheme.fonts.body,
+    lineHeight: 18,
   },
   scrollContent: {
     padding: coachTheme.spacing.lg,
