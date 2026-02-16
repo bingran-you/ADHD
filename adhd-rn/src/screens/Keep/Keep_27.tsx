@@ -11,7 +11,7 @@ export default function Keep_27() {
       <View style={styles.container}>
         <Text style={styles.back}>&lt;</Text>
         <View style={styles.header}>
-          <Text style={styles.label}>AI 医生·卡卡</Text>
+          <Text style={styles.label}>AI 教练·卡卡</Text>
           <Text style={styles.title}>你能接受的难度是?</Text>
         </View>
         <KeepOptionGrid

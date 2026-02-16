@@ -11,7 +11,7 @@ export default function Keep_25() {
       <View style={styles.container}>
         <Text style={styles.back}>&lt;</Text>
         <View style={styles.header}>
-          <Text style={styles.label}>AI 医生·卡卡</Text>
+          <Text style={styles.label}>AI 教练·卡卡</Text>
           <Text style={styles.title}>每周运动天数</Text>
         </View>
         <KeepOptionGrid options={['1 天', '2 天', '3 天', '4 天', '5 天', '6 天', '7 天']} selectedIndex={5} />

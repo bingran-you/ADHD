@@ -11,7 +11,7 @@ export default function Keep_26() {
       <View style={styles.container}>
         <Text style={styles.back}>&lt;</Text>
         <View style={styles.header}>
-          <Text style={styles.label}>AI 医生·卡卡</Text>
+          <Text style={styles.label}>AI 教练·卡卡</Text>
           <Text style={styles.title}>每天运动多长时间?</Text>
         </View>
         <KeepOptionGrid options={['10 分钟左右', '20 分钟左右', '30 分钟左右', '40 分钟以上']} selectedIndex={2} />

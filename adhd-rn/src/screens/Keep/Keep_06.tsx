@@ -10,7 +10,7 @@ export default function Keep_06() {
         <View style={styles.avatar}>
           <View style={styles.avatarInner} />
         </View>
-        <Text style={styles.message}>Hi，我是Keep AI 医生卡卡，欢迎使用 Keep!</Text>
+        <Text style={styles.message}>Hi，我是Keep AI 教练卡卡，欢迎使用 Keep!</Text>
       </View>
     </KeepScreen>
   );

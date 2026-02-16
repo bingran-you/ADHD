@@ -20,7 +20,7 @@ export default function Keep_22() {
       <View style={styles.container}>
         <Text style={styles.back}>&lt;</Text>
         <View style={styles.header}>
-          <Text style={styles.label}>AI 医生·卡卡</Text>
+          <Text style={styles.label}>AI 教练·卡卡</Text>
           <Text style={styles.title}>你的运动目标是什么</Text>
         </View>
         <View style={styles.list}>

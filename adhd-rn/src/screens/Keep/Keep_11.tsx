@@ -23,7 +23,7 @@ export default function Keep_11() {
         <KeepBottomSheet>
           <View style={styles.sheetHeader}>
             <View style={styles.aiDot} />
-            <Text style={styles.sheetLabel}>AI 医生·卡卡</Text>
+            <Text style={styles.sheetLabel}>AI 教练·卡卡</Text>
           </View>
           <Text style={styles.sheetTitle}>你想要达成什么运动目标?</Text>
           <View style={styles.radioGroup}>

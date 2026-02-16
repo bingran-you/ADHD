@@ -1,7 +1,6 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import {
   Animated,
-  AppState,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,9 +16,9 @@ import CoachChip from './components/CoachChip';
 import CoachScreen from './components/CoachScreen';
 import CoachTabBar from './components/CoachTabBar';
 import { concernOptions, strategyLibrary, taskBank, triggerOptions, type ConcernKey, type Task } from './data';
-import { getAppState, getDailyLog, getLogsSince, saveDailyLog, setAppState } from './storage';
+import { getLogsSince, saveDailyLog } from './storage';
 import { coachTheme } from './theme';
-import type { DailyLog, EventDraft, EventEntry, MetricKey, MetricsState } from './types';
+import type { DailyLog, EventState, MetricKey, MetricsState } from './types';
 
 type TabKey = 'today' | 'log' | 'coach' | 'library' | 'trend' | 'profile';
 
@@ -48,20 +47,6 @@ const initialProfile: Profile = {
   caregiver: '妈妈',
 };
 
-const defaultMetrics: MetricsState = {
-  attention: 3,
-  mood: 3,
-  transition: 3,
-  parentCalm: 3,
-  sleep: 3,
-};
-
-const defaultEventDraft: EventDraft = {
-  type: 'good',
-  triggers: [],
-  note: '',
-};
-
 const metricRows: Array<{ key: MetricKey; label: string; hint: string }> = [
   { key: 'attention', label: '注意力持续', hint: '完成任务时的专注程度' },
   { key: 'mood', label: '情绪稳定', hint: '当天情绪起伏情况' },
@@ -76,7 +61,7 @@ const caregiverOptions = ['妈妈', '爸爸', '祖辈', '其他照护者'];
 const tabItems: Array<{ key: TabKey; label: string; icon: 'today' | 'log' | 'coach' | 'library' | 'trend' | 'profile' }> = [
   { key: 'today', label: '今日', icon: 'today' },
   { key: 'log', label: '记录', icon: 'log' },
-  { key: 'coach', label: '医生', icon: 'coach' },
+  { key: 'coach', label: '教练', icon: 'coach' },
   { key: 'library', label: '方法', icon: 'library' },
   { key: 'trend', label: '趋势', icon: 'trend' },
   { key: 'profile', label: '我的', icon: 'profile' },
@@ -188,11 +173,6 @@ function toDateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function fromDateKey(dateKey: string) {
-  const [year, month, day] = dateKey.split('-').map((value) => Number(value));
-  return new Date(year, month - 1, day);
-}
-
 function addDays(date: Date, offset: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + offset);
@@ -225,127 +205,43 @@ function buildTrendSummary(logs: DailyLog[], weekKeys: string[]): TrendSummary[]
         log.metrics.parentCalm +
         log.metrics.sleep) /
       5;
-    const goodCount = log.events.filter((event) => event.type === 'good').length;
-    const hardCount = log.events.filter((event) => event.type === 'hard').length;
     return {
       date,
       average,
       hasData: true,
       completedCount: log.completedTasks.length,
-      goodCount,
-      hardCount,
+      goodCount: log.event.type === 'good' ? 1 : 0,
+      hardCount: log.event.type === 'hard' ? 1 : 0,
     };
   });
 }
 
-const metricConcernMap: Record<MetricKey, ConcernKey> = {
-  attention: 'attention',
-  transition: 'transition',
-  mood: 'emotion',
-  sleep: 'sleep',
-  parentCalm: 'emotion',
-};
-
-function buildTodayTasks(profile: Profile, logs: DailyLog[], dateKey: string): Task[] {
+function buildTodayTasks(profile: Profile): Task[] {
   const selected: ConcernKey[] = profile.concerns.length ? profile.concerns : ['attention'];
   const tasks: Task[] = [];
-  const used = new Set<string>();
-
-  const budgetMap: Record<string, number> = {
-    '5分钟': 1,
-    '10分钟': 2,
-    '20分钟': 3,
-    '30分钟': 3,
-  };
-  const maxTasks = Math.min(3, budgetMap[profile.timeBudget] ?? 3);
-  const seed = Number(dateKey.replace(/-/g, '')) || new Date().getDate();
-
-  const priorities = buildConcernPriority(selected, logs);
-  const coreTasks = taskBank.core;
-
-  const primaryCore = pickRotatedTask(coreTasks, seed);
-  if (primaryCore) {
-    tasks.push(primaryCore);
-    used.add(primaryCore.id);
-  }
-
-  priorities.forEach((concern, index) => {
-    if (tasks.length >= maxTasks) return;
-    const options = taskBank[concern];
-    const picked = pickRotatedTask(options, seed + index + 1);
-    if (picked && !used.has(picked.id)) {
-      tasks.push(picked);
-      used.add(picked.id);
-    }
-  });
-
-  if (tasks.length < maxTasks) {
-    coreTasks.forEach((task, index) => {
-      if (tasks.length >= maxTasks) return;
-      const picked = pickRotatedTask(coreTasks, seed + index + 3);
-      if (picked && !used.has(picked.id)) {
-        tasks.push(picked);
-        used.add(picked.id);
-      }
-    });
-  }
-
-  return tasks.length ? tasks : coreTasks.slice(0, 1);
-}
-
-function pickRotatedTask(options: Task[] | undefined, seed: number): Task | null {
-  if (!options || options.length === 0) return null;
-  const index = Math.abs(seed) % options.length;
-  return options[index];
-}
-
-function buildConcernPriority(selected: ConcernKey[], logs: DailyLog[]) {
-  if (logs.length === 0) return selected;
-
-  const totals: Record<MetricKey, number> = {
-    attention: 0,
-    mood: 0,
-    transition: 0,
-    parentCalm: 0,
-    sleep: 0,
-  };
-  logs.forEach((log) => {
-    totals.attention += log.metrics.attention;
-    totals.mood += log.metrics.mood;
-    totals.transition += log.metrics.transition;
-    totals.parentCalm += log.metrics.parentCalm;
-    totals.sleep += log.metrics.sleep;
-  });
-  const count = Math.max(1, logs.length);
-  const sorted = (Object.keys(totals) as MetricKey[]).sort(
-    (a, b) => totals[a] / count - totals[b] / count
-  );
-  const fromMetrics: ConcernKey[] = [];
-  sorted.forEach((metric) => {
-    const concern = metricConcernMap[metric];
-    if (!fromMetrics.includes(concern)) {
-      fromMetrics.push(concern);
-    }
-  });
 
   selected.forEach((concern) => {
-    if (!fromMetrics.includes(concern)) {
-      fromMetrics.push(concern);
+    const options = taskBank[concern];
+    if (options?.length) {
+      tasks.push(options[0]);
     }
   });
 
-  return fromMetrics;
+  taskBank.core.forEach((task) => {
+    if (!tasks.find((item) => item.id === task.id)) {
+      tasks.push(task);
+    }
+  });
+
+  return tasks.slice(0, 3);
 }
 
-function buildCoachSummary(metrics: MetricsState, completedCount: number, events: EventEntry[]) {
+function buildCoachSummary(metrics: MetricsState, completedCount: number, event: EventState) {
   const average =
     (metrics.attention + metrics.mood + metrics.transition + metrics.parentCalm + metrics.sleep) / 5;
   const moodLow = metrics.mood <= 2;
   const transitionLow = metrics.transition <= 2;
   const sleepLow = metrics.sleep <= 2;
-  const goodCount = events.filter((item) => item.type === 'good').length;
-  const hardCount = events.filter((item) => item.type === 'hard').length;
-  const topTriggers = getTopTriggers(events);
 
   const headline =
     average >= 4
@@ -370,26 +266,11 @@ function buildCoachSummary(metrics: MetricsState, completedCount: number, events
       : '完成任务后加入 5 分钟自由游戏奖励。',
   ];
 
-  const triggerLine = topTriggers.length
-    ? `高频触发：${topTriggers.join('、')}`
+  const triggerLine = event.triggers.length
+    ? `高频触发：${event.triggers.slice(0, 2).join('、')}`
     : '高频触发：暂无明显集中项。';
 
-  const basisLine = `依据：注意力 ${metrics.attention}/5 · 情绪 ${metrics.mood}/5 · 过渡 ${metrics.transition}/5 · 作息 ${metrics.sleep}/5 · 记录 ${events.length} 条（美好 ${goodCount} / 艰难 ${hardCount}）`;
-
-  return { headline, insight, suggestions, triggerLine, basisLine };
-}
-
-function getTopTriggers(events: EventEntry[]) {
-  const counts = new Map<string, number>();
-  events.forEach((event) => {
-    event.triggers.forEach((trigger) => {
-      counts.set(trigger, (counts.get(trigger) ?? 0) + 1);
-    });
-  });
-  return Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 2)
-    .map(([trigger]) => trigger);
+  return { headline, insight, suggestions, triggerLine };
 }
 
 function getCoachReply(input: string) {
@@ -500,20 +381,24 @@ export default function CoachApp() {
   const [activeTab, setActiveTab] = useState<TabKey>('today');
   const [onboarded, setOnboarded] = useState(false);
   const [profile, setProfile] = useState<Profile>(initialProfile);
-  const [draftDate, setDraftDate] = useState(toDateKey(new Date()));
-  const [hydrated, setHydrated] = useState(false);
   const [completedTasks, setCompletedTasks] = useState<string[]>([]);
   const [weeklyLogs, setWeeklyLogs] = useState<DailyLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
-  const [metrics, setMetrics] = useState<MetricsState>(defaultMetrics);
-  const [eventDraft, setEventDraft] = useState<EventDraft>(defaultEventDraft);
-  const [events, setEvents] = useState<EventEntry[]>([]);
+  const [metrics, setMetrics] = useState<MetricsState>({
+    attention: 3,
+    mood: 3,
+    transition: 3,
+    parentCalm: 3,
+    sleep: 3,
+  });
+  const [eventState, setEventState] = useState<EventState>({
+    type: 'good',
+    triggers: [],
+    note: '',
+  });
 
-  const todayTasks = useMemo(
-    () => buildTodayTasks(profile, weeklyLogs, draftDate),
-    [profile, weeklyLogs, draftDate]
-  );
-  const weekKeys = useMemo(() => getWeekDateKeys(fromDateKey(draftDate)), [draftDate]);
+  const todayTasks = useMemo(() => buildTodayTasks(profile), [profile]);
+  const weekKeys = useMemo(() => getWeekDateKeys(), []);
 
   const refreshWeeklyLogs = async () => {
     setLogsLoading(true);
@@ -524,126 +409,19 @@ export default function CoachApp() {
 
   useEffect(() => {
     void refreshWeeklyLogs();
-  }, [weekKeys[0]]);
-
-  useEffect(() => {
-    const hydrate = async () => {
-      const storedProfile = await getAppState<Profile>('profile');
-      const storedOnboarded = await getAppState<boolean>('onboarded');
-      const storedDraftDate = await getAppState<string>('draftDate');
-      const todayKey = toDateKey(new Date());
-      const hasDraftForToday = storedDraftDate === todayKey;
-
-      if (storedProfile) {
-        setProfile(storedProfile);
-      }
-      if (storedOnboarded !== null) {
-        setOnboarded(storedOnboarded);
-      }
-
-      if (hasDraftForToday) {
-        const storedMetrics = await getAppState<MetricsState>('metrics');
-        const storedCompleted = await getAppState<string[]>('completedTasks');
-        const storedEvents = await getAppState<EventEntry[]>('events');
-        const storedDraft = await getAppState<EventDraft>('eventDraft');
-
-        if (storedMetrics) setMetrics(storedMetrics);
-        if (storedCompleted) setCompletedTasks(storedCompleted);
-        if (storedEvents) setEvents(storedEvents);
-        if (storedDraft) setEventDraft(storedDraft);
-        setDraftDate(todayKey);
-      } else {
-        const savedLog = await getDailyLog(todayKey);
-        if (savedLog) {
-          setMetrics(savedLog.metrics);
-          setCompletedTasks(savedLog.completedTasks);
-          setEvents(savedLog.events);
-        } else {
-          setMetrics(defaultMetrics);
-          setCompletedTasks([]);
-          setEvents([]);
-        }
-        setEventDraft({ ...defaultEventDraft });
-        setDraftDate(todayKey);
-      }
-
-      setHydrated(true);
-    };
-
-    void hydrate();
   }, []);
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') return;
-      const todayKey = toDateKey(new Date());
-      if (todayKey === draftDate) return;
-      setDraftDate(todayKey);
-      setMetrics(defaultMetrics);
-      setCompletedTasks([]);
-      setEvents([]);
-      setEventDraft({ ...defaultEventDraft });
-    });
-
-    return () => subscription.remove();
-  }, [draftDate]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    void setAppState('profile', profile);
-  }, [hydrated, profile]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    void setAppState('onboarded', onboarded);
-  }, [hydrated, onboarded]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    void setAppState('draftDate', draftDate);
-  }, [hydrated, draftDate]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    void setAppState('metrics', metrics);
-  }, [hydrated, metrics]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    void setAppState('completedTasks', completedTasks);
-  }, [hydrated, completedTasks]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    void setAppState('events', events);
-  }, [hydrated, events]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    void setAppState('eventDraft', eventDraft);
-  }, [hydrated, eventDraft]);
 
   const handleSaveLog = async () => {
     const log: DailyLog = {
       date: toDateKey(new Date()),
       metrics,
-      events,
+      event: eventState,
       completedTasks,
       createdAt: Date.now(),
     };
     await saveDailyLog(log);
     await refreshWeeklyLogs();
   };
-
-  if (!hydrated) {
-    return (
-      <CoachScreen>
-        <View style={styles.loadingScreen}>
-          <Text style={styles.loadingText}>正在加载...</Text>
-        </View>
-      </CoachScreen>
-    );
-  }
 
   if (!onboarded) {
     return <OnboardingScreen profile={profile} onComplete={(data) => {
@@ -676,11 +454,8 @@ export default function CoachApp() {
               onMetricChange={(key, value) =>
                 setMetrics((current) => ({ ...current, [key]: value }))
               }
-              eventDraft={eventDraft}
-              onEventDraftChange={setEventDraft}
-              events={events}
-              onAddEvent={(entry) => setEvents((current) => [entry, ...current])}
-              onRemoveEvent={(id) => setEvents((current) => current.filter((item) => item.id !== id))}
+              eventState={eventState}
+              onEventChange={setEventState}
               completedTasks={completedTasks}
               onSave={handleSaveLog}
             />
@@ -689,22 +464,14 @@ export default function CoachApp() {
             <CoachTab
               metrics={metrics}
               completedCount={completedTasks.length}
-              events={events}
+              eventState={eventState}
             />
           )}
           {activeTab === 'library' && <LibraryTab />}
           {activeTab === 'trend' && (
             <TrendTab logs={weeklyLogs} weekKeys={weekKeys} loading={logsLoading} />
           )}
-          {activeTab === 'profile' && (
-            <ProfileTab
-              profile={profile}
-              onEditProfile={() => {
-                setOnboarded(false);
-                setActiveTab('today');
-              }}
-            />
-          )}
+          {activeTab === 'profile' && <ProfileTab profile={profile} />}
         </View>
         <CoachTabBar
           items={tabItems}
@@ -765,7 +532,6 @@ function OnboardingScreen({ profile, onComplete }: OnboardingScreenProps) {
                 placeholder="比如：小安"
                 placeholderTextColor={coachTheme.colors.textMuted}
                 style={styles.textInput}
-                testID="onboarding-name-input"
               />
               <Text style={styles.stepTitle}>年龄段</Text>
               <View style={styles.optionGrid}>
@@ -845,7 +611,6 @@ function OnboardingScreen({ profile, onComplete }: OnboardingScreenProps) {
             label={step < 2 ? '下一步' : '生成起始计划'}
             onPress={handleNext}
             disabled={!canNext}
-            testID={step < 2 ? 'onboarding-next' : 'onboarding-generate'}
           />
           {step > 0 ? (
             <Pressable onPress={() => setStep(step - 1)} style={styles.backLink}>
@@ -877,7 +642,7 @@ function TodayTab({ profile, tasks, completedTasks, onToggleTask, onQuickLog, on
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       <Animated.View style={[entrance]}>
         <Text style={styles.greeting}>早上好，{profile.caregiver}</Text>
-        <Text style={styles.heroTitle}>今天只做 {tasks.length} 件小事</Text>
+        <Text style={styles.heroTitle}>今天只做 3 件小事</Text>
         <Text style={styles.heroSubtitle}>
           {profile.childName}（{profile.ageRange}）的起始计划已生成，别求完美，先求完成。
         </Text>
@@ -920,8 +685,8 @@ function TodayTab({ profile, tasks, completedTasks, onToggleTask, onQuickLog, on
         <Text style={styles.quickTitle}>快速入口</Text>
         <Text style={styles.quickHint}>只要 30 秒，记录今天的关键时刻。</Text>
         <View style={styles.quickButtons}>
-          <CoachButton label="去记录" onPress={onQuickLog} style={styles.quickButton} testID="today-quick-log" />
-          <CoachButton label="求助医生" variant="outline" onPress={onAskCoach} />
+          <CoachButton label="去记录" onPress={onQuickLog} style={styles.quickButton} />
+          <CoachButton label="求助教练" variant="outline" onPress={onAskCoach} />
         </View>
       </Card>
     </ScrollView>
@@ -931,30 +696,16 @@ function TodayTab({ profile, tasks, completedTasks, onToggleTask, onQuickLog, on
 type LogTabProps = {
   metrics: MetricsState;
   onMetricChange: (key: MetricKey, value: number) => void;
-  eventDraft: EventDraft;
-  onEventDraftChange: (state: EventDraft) => void;
-  events: EventEntry[];
-  onAddEvent: (entry: EventEntry) => void;
-  onRemoveEvent: (id: string) => void;
+  eventState: EventState;
+  onEventChange: (state: EventState) => void;
   completedTasks: string[];
   onSave: () => Promise<void>;
 };
 
-function LogTab({
-  metrics,
-  onMetricChange,
-  eventDraft,
-  onEventDraftChange,
-  events,
-  onAddEvent,
-  onRemoveEvent,
-  completedTasks,
-  onSave,
-}: LogTabProps) {
+function LogTab({ metrics, onMetricChange, eventState, onEventChange, completedTasks, onSave }: LogTabProps) {
   const entrance = useEntrance(80);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const canAddEvent = eventDraft.note.trim().length > 0 || eventDraft.triggers.length > 0;
 
   const handleSave = async () => {
     setSaving(true);
@@ -992,19 +743,17 @@ function LogTab({
       </Card>
 
       <Card style={styles.eventCard}>
-        <SectionTitle title="事件记录" subtitle={`美好/艰难 · 已记录 ${events.length} 条`} />
+        <SectionTitle title="事件记录" subtitle="美好时光 / 艰难时光" />
         <View style={styles.toggleRow}>
           {[
             { key: 'good', label: '美好时光' },
             { key: 'hard', label: '艰难时光' },
           ].map((option) => {
-            const active = eventDraft.type === option.key;
+            const active = eventState.type === option.key;
             return (
               <Pressable
                 key={option.key}
-                onPress={() =>
-                  onEventDraftChange({ ...eventDraft, type: option.key as 'good' | 'hard' })
-                }
+                onPress={() => onEventChange({ ...eventState, type: option.key as 'good' | 'hard' })}
                 style={[styles.toggleButton, active && styles.toggleButtonActive]}
               >
                 <Text style={[styles.toggleText, active && styles.toggleTextActive]}>
@@ -1018,18 +767,18 @@ function LogTab({
         <Text style={styles.stepTitle}>触发因素</Text>
         <View style={styles.tagRow}>
           {triggerOptions.map((trigger) => {
-            const selected = eventDraft.triggers.includes(trigger);
+            const selected = eventState.triggers.includes(trigger);
             return (
               <CoachChip
                 key={trigger}
                 label={trigger}
                 selected={selected}
                 onPress={() =>
-                  onEventDraftChange({
-                    ...eventDraft,
+                  onEventChange({
+                    ...eventState,
                     triggers: selected
-                      ? eventDraft.triggers.filter((item) => item !== trigger)
-                      : [...eventDraft.triggers, trigger],
+                      ? eventState.triggers.filter((item) => item !== trigger)
+                      : [...eventState.triggers, trigger],
                   })
                 }
                 style={styles.optionChip}
@@ -1040,81 +789,16 @@ function LogTab({
 
         <Text style={styles.stepTitle}>简短记录</Text>
         <TextInput
-          value={eventDraft.note}
-          onChangeText={(text) => onEventDraftChange({ ...eventDraft, note: text })}
+          value={eventState.note}
+          onChangeText={(text) => onEventChange({ ...eventState, note: text })}
           placeholder="发生了什么？你当时怎么处理的？"
           placeholderTextColor={coachTheme.colors.textMuted}
           style={[styles.textInput, styles.textArea]}
           multiline
-          testID="event-note-input"
         />
 
-        <View style={styles.eventActionRow}>
-          <CoachButton
-            label="加入事件"
-            onPress={() => {
-              if (!canAddEvent) return;
-              const entry: EventEntry = {
-                id: Date.now().toString(),
-                createdAt: Date.now(),
-                type: eventDraft.type,
-                triggers: eventDraft.triggers,
-                note: eventDraft.note.trim(),
-              };
-              onAddEvent(entry);
-              onEventDraftChange({ ...defaultEventDraft });
-            }}
-            disabled={!canAddEvent}
-            style={styles.eventActionPrimary}
-            testID="event-add"
-          />
-          <CoachButton
-            label="清空"
-            variant="outline"
-            onPress={() => onEventDraftChange({ ...defaultEventDraft })}
-            style={styles.eventActionSecondary}
-            testID="event-clear"
-          />
-        </View>
-
-        <View style={styles.eventList}>
-          {events.length === 0 ? (
-            <Text style={styles.eventEmpty}>还没有记录事件，先从一个开始。</Text>
-          ) : (
-            events.map((event) => (
-              <View key={event.id} style={styles.eventItem}>
-                <View style={styles.eventItemHeader}>
-                  <Text style={styles.eventType}>
-                    {event.type === 'good' ? '美好时光' : '艰难时光'}
-                  </Text>
-                  <Pressable onPress={() => onRemoveEvent(event.id)}>
-                    <Text style={styles.eventDelete}>删除</Text>
-                  </Pressable>
-                </View>
-                <Text style={styles.eventNote} numberOfLines={2}>
-                  {event.note.length ? event.note : '（无描述）'}
-                </Text>
-                {event.triggers.length ? (
-                  <View style={styles.eventTriggerRow}>
-                    {event.triggers.map((trigger) => (
-                      <Text key={trigger} style={styles.eventTriggerText}>
-                        {trigger}
-                      </Text>
-                    ))}
-                  </View>
-                ) : null}
-              </View>
-            ))
-          )}
-        </View>
-
         <View style={styles.saveRow}>
-          <CoachButton
-            label={saving ? '保存中...' : '保存记录'}
-            onPress={handleSave}
-            style={styles.saveButton}
-            testID="log-save"
-          />
+          <CoachButton label={saving ? '保存中...' : '保存记录'} onPress={handleSave} style={styles.saveButton} />
           {savedAt ? <Text style={styles.savedText}>已保存 {savedAt}</Text> : null}
         </View>
       </Card>
@@ -1125,21 +809,21 @@ function LogTab({
 type CoachTabProps = {
   metrics: MetricsState;
   completedCount: number;
-  events: EventEntry[];
+  eventState: EventState;
 };
 
-function CoachTab({ metrics, completedCount, events }: CoachTabProps) {
+function CoachTab({ metrics, completedCount, eventState }: CoachTabProps) {
   const entrance = useEntrance(80);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Array<{ id: string; role: 'user' | 'assistant'; text: string }>>([
     {
       id: 'welcome',
       role: 'assistant',
-      text: '我是你的 AI 医生，先完成记录，我再给你更精准的建议。',
+      text: '我是你的家长教练，先完成记录，我再给你更精准的建议。',
     },
   ]);
 
-  const summary = buildCoachSummary(metrics, completedCount, events);
+  const summary = buildCoachSummary(metrics, completedCount, eventState);
 
   const handleSend = () => {
     if (!input.trim()) return;
@@ -1157,7 +841,7 @@ function CoachTab({ metrics, completedCount, events }: CoachTabProps) {
     >
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Animated.View style={[entrance]}>
-          <Text style={styles.heroTitle}>AI 医生复盘</Text>
+          <Text style={styles.heroTitle}>AI 教练复盘</Text>
           <Text style={styles.heroSubtitle}>基于今天的记录与任务完成度生成。</Text>
         </Animated.View>
 
@@ -1165,8 +849,6 @@ function CoachTab({ metrics, completedCount, events }: CoachTabProps) {
           <Text style={styles.coachHeadline}>{summary.headline}</Text>
           <Text style={styles.coachInsight}>{summary.insight}</Text>
           <Text style={styles.coachTrigger}>{summary.triggerLine}</Text>
-          <Text style={styles.coachBasis}>{summary.basisLine}</Text>
-          <Text style={styles.coachDisclaimer}>AI 医生建议基于记录，不替代专业诊断。</Text>
           <View style={styles.suggestionList}>
             {summary.suggestions.map((item) => (
               <Text key={item} style={styles.suggestionText}>
@@ -1177,7 +859,7 @@ function CoachTab({ metrics, completedCount, events }: CoachTabProps) {
         </Card>
 
         <Card>
-          <SectionTitle title="对话医生" subtitle="任何困惑都可以问我" />
+          <SectionTitle title="对话教练" subtitle="任何困惑都可以问我" />
           <View style={styles.chatList}>
             {messages.map((message) => (
               <View
@@ -1331,10 +1013,9 @@ function TrendTab({ logs, weekKeys, loading }: TrendTabProps) {
 
 type ProfileTabProps = {
   profile: Profile;
-  onEditProfile: () => void;
 };
 
-function ProfileTab({ profile, onEditProfile }: ProfileTabProps) {
+function ProfileTab({ profile }: ProfileTabProps) {
   const entrance = useEntrance(80);
 
   return (
@@ -1362,7 +1043,6 @@ function ProfileTab({ profile, onEditProfile }: ProfileTabProps) {
           <Text style={styles.profileLabel}>每日投入</Text>
           <Text style={styles.profileValue}>{profile.timeBudget}</Text>
         </View>
-        <CoachButton label="调整档案" variant="outline" onPress={onEditProfile} />
       </Card>
 
       <Card style={styles.profileCard}>
@@ -1374,7 +1054,7 @@ function ProfileTab({ profile, onEditProfile }: ProfileTabProps) {
       <Card style={styles.profileCard}>
         <SectionTitle title="信任与安全" />
         <Text style={styles.profileHint}>
-          本应用中的 AI 医生提供育儿指导与自我管理建议，不替代专业诊断或治疗。
+          本应用提供育儿指导与自我管理建议，不替代专业诊断或治疗。
         </Text>
         <Text style={styles.profileHint}>如有严重情绪或行为风险，请及时寻求专业支持。</Text>
         <Text style={styles.profileSourceTitle}>内容来源</Text>
@@ -1388,16 +1068,6 @@ function ProfileTab({ profile, onEditProfile }: ProfileTabProps) {
 const styles = StyleSheet.create({
   appShell: {
     flex: 1,
-  },
-  loadingScreen: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    fontSize: 14,
-    color: coachTheme.colors.textMuted,
-    fontFamily: coachTheme.fonts.body,
   },
   tabContent: {
     flex: 1,
@@ -1631,69 +1301,6 @@ const styles = StyleSheet.create({
   eventCard: {
     gap: coachTheme.spacing.sm,
   },
-  eventActionRow: {
-    flexDirection: 'row',
-    gap: coachTheme.spacing.sm,
-  },
-  eventActionPrimary: {
-    flex: 1,
-  },
-  eventActionSecondary: {
-    flex: 1,
-  },
-  eventList: {
-    gap: coachTheme.spacing.sm,
-  },
-  eventEmpty: {
-    fontSize: 12,
-    color: coachTheme.colors.textMuted,
-    fontFamily: coachTheme.fonts.body,
-  },
-  eventItem: {
-    borderRadius: coachTheme.radius.md,
-    borderWidth: 1,
-    borderColor: coachTheme.colors.border,
-    padding: 10,
-    backgroundColor: coachTheme.colors.surfaceCool,
-    gap: 6,
-  },
-  eventItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  eventType: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: coachTheme.colors.textPrimary,
-    fontFamily: coachTheme.fonts.heading,
-  },
-  eventDelete: {
-    fontSize: 11,
-    color: coachTheme.colors.accentDeep,
-    fontFamily: coachTheme.fonts.body,
-  },
-  eventNote: {
-    fontSize: 12,
-    color: coachTheme.colors.textSecondary,
-    fontFamily: coachTheme.fonts.body,
-  },
-  eventTriggerRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  eventTriggerText: {
-    fontSize: 10,
-    color: coachTheme.colors.textMuted,
-    fontFamily: coachTheme.fonts.body,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: coachTheme.radius.pill,
-    backgroundColor: coachTheme.colors.surfaceWarm,
-    borderWidth: 1,
-    borderColor: coachTheme.colors.border,
-  },
   toggleRow: {
     flexDirection: 'row',
     gap: 10,
@@ -1770,16 +1377,6 @@ const styles = StyleSheet.create({
   },
   coachTrigger: {
     fontSize: 12,
-    color: coachTheme.colors.textMuted,
-    fontFamily: coachTheme.fonts.body,
-  },
-  coachBasis: {
-    fontSize: 11,
-    color: coachTheme.colors.textMuted,
-    fontFamily: coachTheme.fonts.body,
-  },
-  coachDisclaimer: {
-    fontSize: 11,
     color: coachTheme.colors.textMuted,
     fontFamily: coachTheme.fonts.body,
   },

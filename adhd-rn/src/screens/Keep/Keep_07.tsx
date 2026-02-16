@@ -17,7 +17,7 @@ export default function Keep_07() {
         <KeepBottomSheet>
           <View style={styles.sheetHeader}>
             <View style={styles.aiDot} />
-            <Text style={styles.sheetLabel}>AI 医生·卡卡</Text>
+            <Text style={styles.sheetLabel}>AI 教练·卡卡</Text>
           </View>
           <Text style={styles.sheetTitle}>选择性别,更进一步了解你的情况</Text>
           <Text style={styles.sheetSubtitle}>针对男/女不同年龄段的训练方法有所差异，完善个人信息，更科学地获取运动指导，每半年只能修改一次</Text>

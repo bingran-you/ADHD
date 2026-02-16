@@ -11,7 +11,7 @@ export default function Keep_24() {
       <View style={styles.container}>
         <Text style={styles.back}>&lt;</Text>
         <View style={styles.header}>
-          <Text style={styles.label}>AI 医生·卡卡</Text>
+          <Text style={styles.label}>AI 教练·卡卡</Text>
           <Text style={styles.title}>你想通过什么运动方式增肌?</Text>
         </View>
         <KeepOptionGrid options={['室内徒手健身', '小器械健身', '健身房健身']} selectedIndex={1} />

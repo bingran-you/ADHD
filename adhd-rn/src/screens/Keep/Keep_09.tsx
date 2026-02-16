@@ -22,7 +22,7 @@ export default function Keep_09() {
         <KeepBottomSheet>
           <View style={styles.sheetHeader}>
             <View style={styles.aiDot} />
-            <Text style={styles.sheetLabel}>AI 医生·卡卡</Text>
+            <Text style={styles.sheetLabel}>AI 教练·卡卡</Text>
           </View>
           <Text style={styles.sheetTitle}>选择体重, 获取更精确的热量消耗</Text>
           <Text style={styles.sheetSubtitle}>身高体重不同，热量消耗也有所不同，完善个人信息，运动后可获取更精确的运动消耗</Text>

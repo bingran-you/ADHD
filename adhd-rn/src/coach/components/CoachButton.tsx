@@ -7,7 +7,6 @@ type CoachButtonProps = {
   onPress?: () => void;
   variant?: 'primary' | 'outline' | 'ghost';
   disabled?: boolean;
-  testID?: string;
   style?: ViewStyle;
   textStyle?: TextStyle;
 };
@@ -17,14 +16,12 @@ export default function CoachButton({
   onPress,
   variant = 'primary',
   disabled,
-  testID,
   style,
   textStyle,
 }: CoachButtonProps) {
   return (
     <Pressable
       onPress={onPress}
-      testID={testID}
       style={({ pressed }) => [
         styles.base,
         variant === 'primary' && styles.primary,

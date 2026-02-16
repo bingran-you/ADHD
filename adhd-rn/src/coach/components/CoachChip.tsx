@@ -6,23 +6,14 @@ type CoachChipProps = {
   label: string;
   selected?: boolean;
   onPress?: () => void;
-  testID?: string;
   style?: ViewStyle;
   textStyle?: TextStyle;
 };
 
-export default function CoachChip({
-  label,
-  selected,
-  onPress,
-  testID,
-  style,
-  textStyle,
-}: CoachChipProps) {
+export default function CoachChip({ label, selected, onPress, style, textStyle }: CoachChipProps) {
   return (
     <Pressable
       onPress={onPress}
-      testID={testID}
       style={({ pressed }) => [
         styles.base,
         selected && styles.selected,

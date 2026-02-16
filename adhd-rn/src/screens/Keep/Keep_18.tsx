@@ -28,7 +28,7 @@ export default function Keep_18() {
         </View>
 
         <Text style={styles.quote}>“</Text>
-        <Text style={styles.title}>Hi, 我是 Keep AI 医生卡卡,{'\n'}请问有什么可以帮到你?</Text>
+        <Text style={styles.title}>Hi, 我是 Keep AI 教练卡卡,{'\n'}请问有什么可以帮到你?</Text>
         <Text style={styles.quote}>”</Text>
 
         <View style={styles.grid}>
@@ -49,7 +49,7 @@ export default function Keep_18() {
         </View>
 
         <View style={styles.searchBar}>
-          <Text style={styles.searchPlaceholder}>询问 AI 医生...</Text>
+          <Text style={styles.searchPlaceholder}>询问 AI 教练...</Text>
           <View style={styles.plus}>
             <Text style={styles.plusText}>+</Text>
           </View>

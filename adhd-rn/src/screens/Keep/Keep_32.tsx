@@ -8,7 +8,7 @@ export default function Keep_32() {
     <KeepLightScreen>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.label}>AI 医生·卡卡</Text>
+          <Text style={styles.label}>AI 教练·卡卡</Text>
           <View style={styles.gear} />
         </View>
 
@@ -31,7 +31,7 @@ export default function Keep_32() {
           <Text style={styles.notice}>- 内含 AI 生成，可能存在错误，仅供参考 -</Text>
           <View style={styles.footerCard}>
             <View style={styles.footerContent}>
-              <Text style={styles.footerTitle}>AI 医生 专业指导随时陪伴</Text>
+              <Text style={styles.footerTitle}>AI 教练 专业指导随时陪伴</Text>
               <Text style={styles.footerSubtitle}>帮你科学训练 · 科学健身计划</Text>
             </View>
             <View style={styles.footerButton}>

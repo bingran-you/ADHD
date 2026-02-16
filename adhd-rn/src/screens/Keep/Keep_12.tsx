@@ -23,7 +23,7 @@ export default function Keep_12() {
         <KeepBottomSheet>
           <View style={styles.sheetHeader}>
             <View style={styles.aiDot} />
-            <Text style={styles.sheetLabel}>AI 医生·卡卡</Text>
+            <Text style={styles.sheetLabel}>AI 教练·卡卡</Text>
           </View>
           <Text style={styles.sheetTitle}>你想重点增强哪些部位?</Text>
           <View style={styles.checkboxGroup}>
