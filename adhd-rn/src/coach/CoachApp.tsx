@@ -17,11 +17,18 @@ import CoachScreen from './components/CoachScreen';
 import CoachTabBar from './components/CoachTabBar';
 import {
   concernOptions,
+  intakeAOptions,
+  intakeBOptions,
+  intakeCOptions,
+  intakeDOptions,
+  intakeEOptions,
+  intakeFOptions,
   positiveFactorOptions,
   strategyLibrary,
   taskBank,
   triggerOptions,
   type ConcernKey,
+  type IntakeOption,
   type Task,
 } from './data';
 import { getAppState, getLogsSince, saveDailyLog, setAppState } from './storage';
@@ -36,6 +43,16 @@ type Profile = {
   concerns: ConcernKey[];
   timeBudget: string;
   caregiver: string;
+  intakeA: string[];
+  intakeB: string[];
+  intakeC: string[];
+  intakeD: string[];
+  intakeE: string[];
+  intakeF: string[];
+  positiveFactors: string[];
+  triggerFactors: string[];
+  goodTimeNote: string;
+  hardTimeNote: string;
 };
 
 type TrendSummary = {
@@ -48,11 +65,21 @@ type TrendSummary = {
 };
 
 const initialProfile: Profile = {
-  childName: '孩子',
+  childName: '',
   ageRange: '',
-  concerns: ['attention'],
-  timeBudget: '10分钟',
-  caregiver: '妈妈',
+  concerns: [],
+  timeBudget: '',
+  caregiver: '',
+  intakeA: [],
+  intakeB: [],
+  intakeC: [],
+  intakeD: [],
+  intakeE: [],
+  intakeF: [],
+  positiveFactors: [],
+  triggerFactors: [],
+  goodTimeNote: '',
+  hardTimeNote: '',
 };
 
 const createDefaultMetrics = (): MetricsState => ({
@@ -84,6 +111,27 @@ const normalizeEventState = (event?: Partial<EventState> | null): EventState => 
   return { type, positiveFactors, triggers, note };
 };
 
+const normalizeProfile = (profile?: Partial<Profile> | null): Profile => {
+  if (!profile) return initialProfile;
+  return {
+    childName: typeof profile.childName === 'string' && profile.childName.trim().length > 0 ? profile.childName : initialProfile.childName,
+    ageRange: typeof profile.ageRange === 'string' ? profile.ageRange : '',
+    concerns: Array.isArray(profile.concerns) ? profile.concerns : initialProfile.concerns,
+    timeBudget: typeof profile.timeBudget === 'string' ? profile.timeBudget : initialProfile.timeBudget,
+    caregiver: typeof profile.caregiver === 'string' ? profile.caregiver : initialProfile.caregiver,
+    intakeA: Array.isArray(profile.intakeA) ? profile.intakeA : [],
+    intakeB: Array.isArray(profile.intakeB) ? profile.intakeB : [],
+    intakeC: Array.isArray(profile.intakeC) ? profile.intakeC : [],
+    intakeD: Array.isArray(profile.intakeD) ? profile.intakeD : [],
+    intakeE: Array.isArray(profile.intakeE) ? profile.intakeE : [],
+    intakeF: Array.isArray(profile.intakeF) ? profile.intakeF : [],
+    positiveFactors: Array.isArray(profile.positiveFactors) ? profile.positiveFactors : [],
+    triggerFactors: Array.isArray(profile.triggerFactors) ? profile.triggerFactors : [],
+    goodTimeNote: typeof profile.goodTimeNote === 'string' ? profile.goodTimeNote : '',
+    hardTimeNote: typeof profile.hardTimeNote === 'string' ? profile.hardTimeNote : '',
+  };
+};
+
 type SavedTodayState = {
   date: string;
   metrics: MetricsState;
@@ -111,6 +159,25 @@ const tabItems: Array<{ key: TabKey; label: string; icon: 'today' | 'log' | 'coa
   { key: 'trend', label: '趋势', icon: 'trend' },
   { key: 'profile', label: '我的', icon: 'profile' },
 ];
+
+const intakeLabelMap = new Map<string, string>([
+  ...intakeAOptions,
+  ...intakeBOptions,
+  ...intakeCOptions,
+  ...intakeDOptions,
+  ...intakeEOptions,
+  ...intakeFOptions,
+].map((item) => [item.id, item.label]));
+
+const formatIntakeLabels = (values: string[]) =>
+  values.map((value) => intakeLabelMap.get(value) ?? value).join('、');
+
+const concernLabelMap = new Map<ConcernKey, string>(
+  concernOptions.map((option) => [option.key, option.label]),
+);
+
+const formatConcernLabels = (values: ConcernKey[]) =>
+  values.map((value) => concernLabelMap.get(value) ?? value).join('、');
 
 function useEntrance(delay = 0) {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -454,7 +521,7 @@ export default function CoachApp() {
           getAppState<SavedTodayState>('today_state'),
         ]);
         if (!active) return;
-        if (savedProfile) setProfile(savedProfile);
+        if (savedProfile) setProfile(normalizeProfile(savedProfile));
         if (typeof savedOnboarded === 'boolean') setOnboarded(savedOnboarded);
         const todayKey = toDateKey(new Date());
         if (savedToday && savedToday.date === todayKey) {
@@ -622,15 +689,89 @@ type OnboardingScreenProps = {
 function OnboardingScreen({ profile, onComplete }: OnboardingScreenProps) {
   const entrance = useEntrance();
   const [step, setStep] = useState(0);
-  const [draft, setDraft] = useState(profile);
+  const [draft, setDraft] = useState(() => normalizeProfile(profile));
+  const totalSteps = 9;
+  const lastStep = totalSteps - 1;
 
-  const canNext =
-    (step === 0 && draft.ageRange.length > 0) ||
-    (step === 1 && draft.concerns.length > 0) ||
-    (step === 2 && draft.timeBudget.length > 0 && draft.caregiver.length > 0);
+  type IntakeField =
+    | 'intakeA'
+    | 'intakeB'
+    | 'intakeC'
+    | 'intakeD'
+    | 'intakeE'
+    | 'intakeF'
+    | 'positiveFactors'
+    | 'triggerFactors';
+
+  const toggleIntakeField = (field: IntakeField, value: string) => {
+    setDraft((current) => {
+      const list = current[field] as string[];
+      const next = list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
+      return { ...current, [field]: next };
+    });
+  };
+
+  const renderIntakeOptions = (
+    options: IntakeOption[],
+    selectedValues: string[],
+    onToggle: (id: string) => void,
+    testPrefix: string,
+  ) => (
+    <View style={styles.optionList}>
+      {options.map((option) => {
+        const selected = selectedValues.includes(option.id);
+        return (
+          <View key={option.id} style={styles.optionItemWide}>
+            <CoachChip
+              label={option.label}
+              selected={selected}
+              onPress={() => onToggle(option.id)}
+              testID={`${testPrefix}-${option.id}`}
+            />
+            <Text style={styles.optionHint}>{option.hint}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+
+  const goodTimeFilled =
+    draft.positiveFactors.length > 0 || draft.goodTimeNote.trim().length > 0;
+  const hardTimeFilled =
+    draft.triggerFactors.length > 0 || draft.hardTimeNote.trim().length > 0;
+
+  const canNext = (() => {
+    switch (step) {
+      case 0:
+        return (
+          draft.childName.trim().length > 0 &&
+          draft.ageRange.length > 0 &&
+          draft.timeBudget.length > 0 &&
+          draft.caregiver.length > 0
+        );
+      case 1:
+        return draft.intakeA.length > 0;
+      case 2:
+        return draft.intakeB.length > 0;
+      case 3:
+        return draft.intakeC.length > 0;
+      case 4:
+        return draft.intakeD.length > 0;
+      case 5:
+        return draft.intakeE.length > 0;
+      case 6:
+        return draft.intakeF.length > 0;
+      case 7:
+        return goodTimeFilled && hardTimeFilled;
+      case 8:
+        return draft.concerns.length > 0;
+      default:
+        return false;
+    }
+  })();
 
   const handleNext = () => {
-    if (step < 2) {
+    if (step < lastStep) {
       setStep(step + 1);
       return;
     }
@@ -641,10 +782,10 @@ function OnboardingScreen({ profile, onComplete }: OnboardingScreenProps) {
     <CoachScreen>
       <Animated.View style={[styles.onboarding, entrance]}>
         <View style={styles.onboardingHeader}>
-          <Text style={styles.onboardingTitle}>先认识孩子</Text>
-          <Text style={styles.onboardingSubtitle}>3 步生成起始计划，30 秒完成。</Text>
+          <Text style={styles.onboardingTitle}>深入了解孩子</Text>
+          <Text style={styles.onboardingSubtitle}>按书中评估与双日记结构逐步收集信息（共 {totalSteps} 步）。</Text>
           <View style={styles.progressRow}>
-            {[0, 1, 2].map((index) => (
+            {Array.from({ length: totalSteps }, (_, index) => (
               <View
                 key={index}
                 style={[styles.progressDot, step === index && styles.progressDotActive]}
@@ -678,12 +819,151 @@ function OnboardingScreen({ profile, onComplete }: OnboardingScreenProps) {
                   />
                 ))}
               </View>
+              <Text style={styles.stepTitle}>主要照护者</Text>
+              <View style={styles.optionGrid}>
+                {caregiverOptions.map((option, index) => (
+                  <CoachChip
+                    key={option}
+                    label={option}
+                    selected={draft.caregiver === option}
+                    onPress={() => setDraft((current) => ({ ...current, caregiver: option }))}
+                    style={styles.optionChip}
+                    testID={`onboarding-caregiver-${index}`}
+                  />
+                ))}
+              </View>
+              <Text style={styles.stepTitle}>每天可投入时间</Text>
+              <View style={styles.optionGrid}>
+                {timeOptions.map((option, index) => (
+                  <CoachChip
+                    key={option}
+                    label={option}
+                    selected={draft.timeBudget === option}
+                    onPress={() => setDraft((current) => ({ ...current, timeBudget: option }))}
+                    style={styles.optionChip}
+                    testID={`onboarding-time-${index}`}
+                  />
+                ))}
+              </View>
             </View>
           )}
 
           {step === 1 && (
             <View style={styles.stepCard}>
+              <Text style={styles.stepTitle}>核心症状与执行功能（可多选）</Text>
+              <Text style={styles.stepHint}>来自书中的核心表现评估</Text>
+              {renderIntakeOptions(intakeAOptions, draft.intakeA, (id) => toggleIntakeField('intakeA', id), 'onboarding-a')}
+            </View>
+          )}
+
+          {step === 2 && (
+            <View style={styles.stepCard}>
+              <Text style={styles.stepTitle}>情绪与行为调节（可多选）</Text>
+              <Text style={styles.stepHint}>记录情绪波动与行为反应</Text>
+              {renderIntakeOptions(intakeBOptions, draft.intakeB, (id) => toggleIntakeField('intakeB', id), 'onboarding-b')}
+            </View>
+          )}
+
+          {step === 3 && (
+            <View style={styles.stepCard}>
+              <Text style={styles.stepTitle}>沟通与社交（可多选）</Text>
+              <Text style={styles.stepHint}>来自书中的沟通与同伴互动要点</Text>
+              {renderIntakeOptions(intakeCOptions, draft.intakeC, (id) => toggleIntakeField('intakeC', id), 'onboarding-c')}
+            </View>
+          )}
+
+          {step === 4 && (
+            <View style={styles.stepCard}>
+              <Text style={styles.stepTitle}>日常生活与生理节律（可多选）</Text>
+              <Text style={styles.stepHint}>作息、饮食与自理情况</Text>
+              {renderIntakeOptions(intakeDOptions, draft.intakeD, (id) => toggleIntakeField('intakeD', id), 'onboarding-d')}
+            </View>
+          )}
+
+          {step === 5 && (
+            <View style={styles.stepCard}>
+              <Text style={styles.stepTitle}>游戏、注意力训练与学习（可多选）</Text>
+              <Text style={styles.stepHint}>关注游戏、阅读与学习表现</Text>
+              {renderIntakeOptions(intakeEOptions, draft.intakeE, (id) => toggleIntakeField('intakeE', id), 'onboarding-e')}
+            </View>
+          )}
+
+          {step === 6 && (
+            <View style={styles.stepCard}>
+              <Text style={styles.stepTitle}>公共场合 / 学校 / 过渡（可多选）</Text>
+              <Text style={styles.stepHint}>外出与学校场景的表现</Text>
+              {renderIntakeOptions(intakeFOptions, draft.intakeF, (id) => toggleIntakeField('intakeF', id), 'onboarding-f')}
+            </View>
+          )}
+
+          {step === 7 && (
+            <>
+              <View style={styles.stepCard}>
+                <Text style={styles.stepTitle}>美好时光日记</Text>
+                <Text style={styles.stepHint}>孩子有什么好的表现？你做了什么来回应他？</Text>
+                <TextInput
+                  value={draft.goodTimeNote}
+                  onChangeText={(text) => setDraft((current) => ({ ...current, goodTimeNote: text }))}
+                  placeholder="记录美好时光的关键细节"
+                  placeholderTextColor={coachTheme.colors.textMuted}
+                  style={[styles.textInput, styles.textArea]}
+                  multiline
+                  testID="onboarding-good-note"
+                />
+                <Text style={styles.stepTitle}>积极因素（美好时光）</Text>
+                <View style={styles.optionGrid}>
+                  {positiveFactorOptions.map((option) => {
+                    const selected = draft.positiveFactors.includes(option);
+                    return (
+                      <CoachChip
+                        key={option}
+                        label={option}
+                        selected={selected}
+                        onPress={() => toggleIntakeField('positiveFactors', option)}
+                        style={styles.optionChip}
+                        testID={`onboarding-positive-${option}`}
+                      />
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.stepCard}>
+                <Text style={styles.stepTitle}>艰难时光日记</Text>
+                <Text style={styles.stepHint}>记录与孩子共同经历的困难，你做了什么？</Text>
+                <TextInput
+                  value={draft.hardTimeNote}
+                  onChangeText={(text) => setDraft((current) => ({ ...current, hardTimeNote: text }))}
+                  placeholder="发生了什么？你做了什么？"
+                  placeholderTextColor={coachTheme.colors.textMuted}
+                  style={[styles.textInput, styles.textArea]}
+                  multiline
+                  testID="onboarding-hard-note"
+                />
+                <Text style={styles.stepTitle}>触发因素（艰难时光）</Text>
+                <View style={styles.optionGrid}>
+                  {triggerOptions.map((option) => {
+                    const selected = draft.triggerFactors.includes(option);
+                    return (
+                      <CoachChip
+                        key={option}
+                        label={option}
+                        selected={selected}
+                        onPress={() => toggleIntakeField('triggerFactors', option)}
+                        style={styles.optionChip}
+                        testID={`onboarding-trigger-${option}`}
+                      />
+                    );
+                  })}
+                </View>
+              </View>
+            </>
+          )}
+
+          {step === 8 && (
+            <View style={styles.stepCard}>
               <Text style={styles.stepTitle}>最想先改善 1-2 项</Text>
+              <Text style={styles.stepHint}>用于生成起始计划与每日任务。</Text>
               <View style={styles.optionGrid}>
                 {concernOptions.map((option) => {
                   const selected = draft.concerns.includes(option.key);
@@ -709,42 +989,11 @@ function OnboardingScreen({ profile, onComplete }: OnboardingScreenProps) {
               </View>
             </View>
           )}
-
-          {step === 2 && (
-            <View style={styles.stepCard}>
-              <Text style={styles.stepTitle}>每天可投入时间</Text>
-              <View style={styles.optionGrid}>
-                {timeOptions.map((option, index) => (
-                  <CoachChip
-                    key={option}
-                    label={option}
-                    selected={draft.timeBudget === option}
-                    onPress={() => setDraft((current) => ({ ...current, timeBudget: option }))}
-                    style={styles.optionChip}
-                    testID={`onboarding-time-${index}`}
-                  />
-                ))}
-              </View>
-              <Text style={styles.stepTitle}>主要照护者</Text>
-              <View style={styles.optionGrid}>
-                {caregiverOptions.map((option, index) => (
-                  <CoachChip
-                    key={option}
-                    label={option}
-                    selected={draft.caregiver === option}
-                    onPress={() => setDraft((current) => ({ ...current, caregiver: option }))}
-                    style={styles.optionChip}
-                    testID={`onboarding-caregiver-${index}`}
-                  />
-                ))}
-              </View>
-            </View>
-          )}
         </ScrollView>
 
         <View style={styles.onboardingFooter}>
           <CoachButton
-            label={step < 2 ? '下一步' : '生成起始计划'}
+            label={step < lastStep ? '下一步' : '完成信息采集'}
             onPress={handleNext}
             disabled={!canNext}
             testID="onboarding-next"
@@ -1198,6 +1447,12 @@ type ProfileTabProps = {
 
 function ProfileTab({ profile }: ProfileTabProps) {
   const entrance = useEntrance(80);
+  const formatList = (values: string[]) =>
+    values.length > 0 ? formatIntakeLabels(values) : '未填写';
+  const formatPlainList = (values: string[]) => (values.length > 0 ? values.join('、') : '未填写');
+  const formatNote = (value: string) => (value.trim().length > 0 ? value : '未填写');
+  const formatConcerns = () =>
+    profile.concerns.length > 0 ? formatConcernLabels(profile.concerns) : '未填写';
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -1223,6 +1478,54 @@ function ProfileTab({ profile }: ProfileTabProps) {
         <View style={styles.profileRow}>
           <Text style={styles.profileLabel}>每日投入</Text>
           <Text style={styles.profileValue}>{profile.timeBudget}</Text>
+        </View>
+      </Card>
+
+      <Card style={styles.profileCard}>
+        <SectionTitle title="信息采集摘要" subtitle="书中评估项目与双日记" />
+        <View style={styles.profileRow}>
+          <Text style={styles.profileLabel}>核心症状</Text>
+          <Text style={styles.profileValue}>{formatList(profile.intakeA)}</Text>
+        </View>
+        <View style={styles.profileRow}>
+          <Text style={styles.profileLabel}>情绪行为</Text>
+          <Text style={styles.profileValue}>{formatList(profile.intakeB)}</Text>
+        </View>
+        <View style={styles.profileRow}>
+          <Text style={styles.profileLabel}>沟通社交</Text>
+          <Text style={styles.profileValue}>{formatList(profile.intakeC)}</Text>
+        </View>
+        <View style={styles.profileRow}>
+          <Text style={styles.profileLabel}>日常作息</Text>
+          <Text style={styles.profileValue}>{formatList(profile.intakeD)}</Text>
+        </View>
+        <View style={styles.profileRow}>
+          <Text style={styles.profileLabel}>游戏学习</Text>
+          <Text style={styles.profileValue}>{formatList(profile.intakeE)}</Text>
+        </View>
+        <View style={styles.profileRow}>
+          <Text style={styles.profileLabel}>公共场合</Text>
+          <Text style={styles.profileValue}>{formatList(profile.intakeF)}</Text>
+        </View>
+        <View style={styles.profileRow}>
+          <Text style={styles.profileLabel}>积极因素</Text>
+          <Text style={styles.profileValue}>{formatPlainList(profile.positiveFactors)}</Text>
+        </View>
+        <View style={styles.profileRow}>
+          <Text style={styles.profileLabel}>触发因素</Text>
+          <Text style={styles.profileValue}>{formatPlainList(profile.triggerFactors)}</Text>
+        </View>
+        <View style={styles.profileRow}>
+          <Text style={styles.profileLabel}>美好时光</Text>
+          <Text style={styles.profileValue}>{formatNote(profile.goodTimeNote)}</Text>
+        </View>
+        <View style={styles.profileRow}>
+          <Text style={styles.profileLabel}>艰难时光</Text>
+          <Text style={styles.profileValue}>{formatNote(profile.hardTimeNote)}</Text>
+        </View>
+        <View style={styles.profileRow}>
+          <Text style={styles.profileLabel}>优先改善</Text>
+          <Text style={styles.profileValue}>{formatConcerns()}</Text>
         </View>
       </Card>
 
@@ -1746,17 +2049,22 @@ const styles = StyleSheet.create({
   },
   profileRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 8,
   },
   profileLabel: {
     fontSize: 12,
     color: coachTheme.colors.textMuted,
     fontFamily: coachTheme.fonts.body,
+    minWidth: 72,
   },
   profileValue: {
     fontSize: 13,
     color: coachTheme.colors.textPrimary,
     fontFamily: coachTheme.fonts.heading,
+    flex: 1,
+    textAlign: 'right',
+    lineHeight: 18,
   },
   profileHint: {
     fontSize: 12,
@@ -1815,13 +2123,25 @@ const styles = StyleSheet.create({
     borderColor: coachTheme.colors.border,
     gap: coachTheme.spacing.sm,
   },
+  stepHint: {
+    fontSize: 12,
+    color: coachTheme.colors.textMuted,
+    fontFamily: coachTheme.fonts.body,
+  },
   optionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
   },
+  optionList: {
+    gap: coachTheme.spacing.sm,
+  },
   optionItem: {
     width: '48%',
+    gap: 4,
+  },
+  optionItemWide: {
+    width: '100%',
     gap: 4,
   },
   optionHint: {
