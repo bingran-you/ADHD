@@ -15,7 +15,15 @@ import CoachButton from './components/CoachButton';
 import CoachChip from './components/CoachChip';
 import CoachScreen from './components/CoachScreen';
 import CoachTabBar from './components/CoachTabBar';
-import { concernOptions, strategyLibrary, taskBank, triggerOptions, type ConcernKey, type Task } from './data';
+import {
+  concernOptions,
+  positiveFactorOptions,
+  strategyLibrary,
+  taskBank,
+  triggerOptions,
+  type ConcernKey,
+  type Task,
+} from './data';
 import { getAppState, getLogsSince, saveDailyLog, setAppState } from './storage';
 import { coachTheme } from './theme';
 import type { DailyLog, EventState, MetricKey, MetricsState } from './types';
@@ -57,9 +65,24 @@ const createDefaultMetrics = (): MetricsState => ({
 
 const createDefaultEventState = (): EventState => ({
   type: 'good',
+  positiveFactors: [],
   triggers: [],
   note: '',
 });
+
+const normalizeEventState = (event?: Partial<EventState> | null): EventState => {
+  if (!event) return createDefaultEventState();
+  const type = event.type === 'hard' ? 'hard' : 'good';
+  const positiveFactors = Array.isArray(event.positiveFactors) ? event.positiveFactors.filter(Boolean) : [];
+  const triggers = Array.isArray(event.triggers) ? event.triggers.filter(Boolean) : [];
+  const note = typeof event.note === 'string' ? event.note : '';
+
+  if (type === 'good' && positiveFactors.length === 0 && triggers.length > 0) {
+    return { type, positiveFactors: triggers, triggers: [], note };
+  }
+
+  return { type, positiveFactors, triggers, note };
+};
 
 type SavedTodayState = {
   date: string;
@@ -288,9 +311,11 @@ function buildCoachSummary(metrics: MetricsState, completedCount: number, event:
       : '完成任务后加入 5 分钟自由游戏奖励。',
   ];
 
-  const triggerLine = event.triggers.length
-    ? `高频触发：${event.triggers.slice(0, 2).join('、')}`
-    : '高频触发：暂无明显集中项。';
+  const factorLabel = event.type === 'good' ? '积极因素' : '触发因素';
+  const factorList = event.type === 'good' ? event.positiveFactors : event.triggers;
+  const triggerLine = factorList.length
+    ? `${factorLabel}：${factorList.slice(0, 2).join('、')}`
+    : `${factorLabel}：暂无明显集中项。`;
 
   return { headline, insight, suggestions, triggerLine };
 }
@@ -434,7 +459,7 @@ export default function CoachApp() {
         const todayKey = toDateKey(new Date());
         if (savedToday && savedToday.date === todayKey) {
           setMetrics(savedToday.metrics);
-          setEventState(savedToday.event);
+          setEventState(normalizeEventState(savedToday.event));
           setCompletedTasks(savedToday.completedTasks);
         } else {
           setMetrics(createDefaultMetrics());
@@ -828,6 +853,10 @@ function LogTab({ metrics, onMetricChange, eventState, onEventChange, completedT
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const isGoodTime = eventState.type === 'good';
+  const factorLabel = isGoodTime ? '积极因素' : '触发因素';
+  const factorOptions = isGoodTime ? positiveFactorOptions : triggerOptions;
+  const selectedFactors = isGoodTime ? eventState.positiveFactors : eventState.triggers;
 
   const handleSave = async () => {
     setSaving(true);
@@ -897,21 +926,22 @@ function LogTab({ metrics, onMetricChange, eventState, onEventChange, completedT
           })}
         </View>
 
-        <Text style={styles.stepTitle}>触发因素</Text>
+        <Text style={styles.stepTitle}>{factorLabel}</Text>
         <View style={styles.tagRow}>
-          {triggerOptions.map((trigger) => {
-            const selected = eventState.triggers.includes(trigger);
+          {factorOptions.map((factor) => {
+            const selected = selectedFactors.includes(factor);
+            const nextFactors = selected
+              ? selectedFactors.filter((item) => item !== factor)
+              : [...selectedFactors, factor];
             return (
               <CoachChip
-                key={trigger}
-                label={trigger}
+                key={factor}
+                label={factor}
                 selected={selected}
                 onPress={() =>
                   onEventChange({
                     ...eventState,
-                    triggers: selected
-                      ? eventState.triggers.filter((item) => item !== trigger)
-                      : [...eventState.triggers, trigger],
+                    ...(isGoodTime ? { positiveFactors: nextFactors } : { triggers: nextFactors }),
                   })
                 }
                 style={styles.optionChip}

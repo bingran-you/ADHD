@@ -4,6 +4,7 @@ export type MetricsState = Record<MetricKey, number>;
 
 export type EventState = {
   type: 'good' | 'hard';
+  positiveFactors: string[];
   triggers: string[];
   note: string;
 };

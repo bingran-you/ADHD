@@ -18,15 +18,26 @@ export const concernOptions: Array<{ key: ConcernKey; label: string; hint: strin
   { key: 'social', label: '社交冲突', hint: '轮流等待、分享困难' },
 ];
 
+export const positiveFactorOptions = [
+  '眼神交流',
+  '听得到的夸奖',
+  '高质量时间',
+  '连贯的日程',
+  '倒计时',
+  '使用短句',
+  '两个选项',
+  '安静时间',
+];
+
 export const triggerOptions = [
   '饥饿',
-  '疲劳',
-  '被打断',
-  '规则冲突',
-  '人多嘈杂',
-  '改变计划',
-  '同伴冲突',
-  '期待落空',
+  '疲惫',
+  '情绪变化',
+  '日程安排改变',
+  '改变任务',
+  '和朋友玩太久',
+  '游戏太吵',
+  '觉得不公平',
 ];
 
 export const taskBank: Record<ConcernKey | 'core', Task[]> = {
