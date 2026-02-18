@@ -916,7 +916,7 @@ function OnboardingScreen({ profile, onComplete, initialStep = 0 }: OnboardingSc
           {step === 1 && (
             <View style={styles.stepCard}>
               <Text style={styles.stepTitle}>核心症状与执行功能（可多选）</Text>
-              <Text style={styles.stepHint}>来自书中的核心表现评估</Text>
+              <Text style={styles.stepHint}>勾选孩子经常出现的表现（不需要精确量化）。</Text>
               {renderIntakeOptions(intakeAOptions, draft.intakeA, (id) => toggleIntakeField('intakeA', id), 'onboarding-a')}
             </View>
           )}
@@ -924,7 +924,7 @@ function OnboardingScreen({ profile, onComplete, initialStep = 0 }: OnboardingSc
           {step === 2 && (
             <View style={styles.stepCard}>
               <Text style={styles.stepTitle}>情绪与行为调节（可多选）</Text>
-              <Text style={styles.stepHint}>记录情绪波动与行为反应</Text>
+              <Text style={styles.stepHint}>勾选常见情绪或行为反应。</Text>
               {renderIntakeOptions(intakeBOptions, draft.intakeB, (id) => toggleIntakeField('intakeB', id), 'onboarding-b')}
             </View>
           )}
@@ -932,7 +932,7 @@ function OnboardingScreen({ profile, onComplete, initialStep = 0 }: OnboardingSc
           {step === 3 && (
             <View style={styles.stepCard}>
               <Text style={styles.stepTitle}>沟通与社交（可多选）</Text>
-              <Text style={styles.stepHint}>来自书中的沟通与同伴互动要点</Text>
+              <Text style={styles.stepHint}>勾选在沟通或社交中常见的困难。</Text>
               {renderIntakeOptions(intakeCOptions, draft.intakeC, (id) => toggleIntakeField('intakeC', id), 'onboarding-c')}
             </View>
           )}
@@ -940,7 +940,7 @@ function OnboardingScreen({ profile, onComplete, initialStep = 0 }: OnboardingSc
           {step === 4 && (
             <View style={styles.stepCard}>
               <Text style={styles.stepTitle}>日常生活与生理节律（可多选）</Text>
-              <Text style={styles.stepHint}>作息、饮食与自理情况</Text>
+              <Text style={styles.stepHint}>勾选作息、饮食或自理方面的常见状况。</Text>
               {renderIntakeOptions(intakeDOptions, draft.intakeD, (id) => toggleIntakeField('intakeD', id), 'onboarding-d')}
             </View>
           )}
@@ -948,7 +948,7 @@ function OnboardingScreen({ profile, onComplete, initialStep = 0 }: OnboardingSc
           {step === 5 && (
             <View style={styles.stepCard}>
               <Text style={styles.stepTitle}>游戏、注意力训练与学习（可多选）</Text>
-              <Text style={styles.stepHint}>关注游戏、阅读与学习表现</Text>
+              <Text style={styles.stepHint}>勾选游戏、阅读或学习中的常见表现。</Text>
               {renderIntakeOptions(intakeEOptions, draft.intakeE, (id) => toggleIntakeField('intakeE', id), 'onboarding-e')}
             </View>
           )}
@@ -956,7 +956,7 @@ function OnboardingScreen({ profile, onComplete, initialStep = 0 }: OnboardingSc
           {step === 6 && (
             <View style={styles.stepCard}>
               <Text style={styles.stepTitle}>公共场合 / 学校 / 过渡（可多选）</Text>
-              <Text style={styles.stepHint}>外出与学校场景的表现</Text>
+              <Text style={styles.stepHint}>勾选外出与学校场景中的常见困难。</Text>
               {renderIntakeOptions(intakeFOptions, draft.intakeF, (id) => toggleIntakeField('intakeF', id), 'onboarding-f')}
             </View>
           )}
