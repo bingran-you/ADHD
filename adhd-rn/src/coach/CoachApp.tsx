@@ -64,6 +64,22 @@ type TrendSummary = {
   hardCount: number;
 };
 
+type SetupStep = {
+  key: string;
+  required: boolean;
+  isComplete: (profile: Profile) => boolean;
+};
+
+type SetupProgress = {
+  percent: number;
+  requiredDone: number;
+  requiredTotal: number;
+  optionalDone: number;
+  optionalTotal: number;
+  remainingCount: number;
+  nextStepIndex: number;
+};
+
 const initialProfile: Profile = {
   childName: '',
   ageRange: '',
@@ -80,6 +96,57 @@ const initialProfile: Profile = {
   triggerFactors: [],
   goodTimeNote: '',
   hardTimeNote: '',
+};
+
+const isBasicComplete = (profile: Profile) =>
+  profile.childName.trim().length > 0 &&
+  profile.ageRange.trim().length > 0 &&
+  profile.timeBudget.trim().length > 0 &&
+  profile.caregiver.trim().length > 0;
+
+const hasGoodTimeInfo = (profile: Profile) =>
+  profile.positiveFactors.length > 0 || profile.goodTimeNote.trim().length > 0;
+
+const hasHardTimeInfo = (profile: Profile) =>
+  profile.triggerFactors.length > 0 || profile.hardTimeNote.trim().length > 0;
+
+const isDiaryComplete = (profile: Profile) => hasGoodTimeInfo(profile) && hasHardTimeInfo(profile);
+
+const setupSteps: SetupStep[] = [
+  { key: 'basic', required: true, isComplete: isBasicComplete },
+  { key: 'intakeA', required: false, isComplete: (profile) => profile.intakeA.length > 0 },
+  { key: 'intakeB', required: false, isComplete: (profile) => profile.intakeB.length > 0 },
+  { key: 'intakeC', required: false, isComplete: (profile) => profile.intakeC.length > 0 },
+  { key: 'intakeD', required: false, isComplete: (profile) => profile.intakeD.length > 0 },
+  { key: 'intakeE', required: false, isComplete: (profile) => profile.intakeE.length > 0 },
+  { key: 'intakeF', required: false, isComplete: (profile) => profile.intakeF.length > 0 },
+  { key: 'diary', required: false, isComplete: isDiaryComplete },
+  { key: 'concerns', required: true, isComplete: (profile) => profile.concerns.length > 0 },
+];
+
+const REQUIRED_PROGRESS_WEIGHT = 0.6;
+
+const getSetupProgress = (profile: Profile): SetupProgress => {
+  const requiredSteps = setupSteps.filter((step) => step.required);
+  const optionalSteps = setupSteps.filter((step) => !step.required);
+  const requiredDone = requiredSteps.filter((step) => step.isComplete(profile)).length;
+  const optionalDone = optionalSteps.filter((step) => step.isComplete(profile)).length;
+  const requiredRatio = requiredSteps.length > 0 ? requiredDone / requiredSteps.length : 1;
+  const optionalRatio = optionalSteps.length > 0 ? optionalDone / optionalSteps.length : 1;
+  const weighted = requiredRatio * REQUIRED_PROGRESS_WEIGHT + optionalRatio * (1 - REQUIRED_PROGRESS_WEIGHT);
+  const percent = Math.round(Math.min(1, Math.max(0, weighted)) * 100);
+  const remainingCount = setupSteps.filter((step) => !step.isComplete(profile)).length;
+  const nextStepIndex = setupSteps.findIndex((step) => !step.isComplete(profile));
+
+  return {
+    percent,
+    requiredDone,
+    requiredTotal: requiredSteps.length,
+    optionalDone,
+    optionalTotal: optionalSteps.length,
+    remainingCount,
+    nextStepIndex: nextStepIndex === -1 ? 0 : nextStepIndex,
+  };
 };
 
 const createDefaultMetrics = (): MetricsState => ({
@@ -498,6 +565,8 @@ export default function CoachApp() {
   const [hydrated, setHydrated] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const [onboarded, setOnboarded] = useState(false);
+  const [showSetup, setShowSetup] = useState(false);
+  const [setupStartStep, setSetupStartStep] = useState(0);
   const [profile, setProfile] = useState<Profile>(initialProfile);
   const [completedTasks, setCompletedTasks] = useState<string[]>([]);
   const [weeklyLogs, setWeeklyLogs] = useState<DailyLog[]>([]);
@@ -508,6 +577,7 @@ export default function CoachApp() {
 
   const todayTasks = useMemo(() => buildTodayTasks(profile), [profile]);
   const weekKeys = useMemo(() => getWeekDateKeys(), []);
+  const setupProgress = useMemo(() => getSetupProgress(profile), [profile]);
 
   useEffect(() => {
     let active = true;
@@ -621,11 +691,18 @@ export default function CoachApp() {
     );
   }
 
-  if (!onboarded) {
-    return <OnboardingScreen profile={profile} onComplete={(data) => {
-      setProfile(data);
-      setOnboarded(true);
-    }} />;
+  if (!onboarded || showSetup) {
+    return (
+      <OnboardingScreen
+        profile={profile}
+        initialStep={showSetup ? setupStartStep : 0}
+        onComplete={(data) => {
+          setProfile(data);
+          setOnboarded(true);
+          setShowSetup(false);
+        }}
+      />
+    );
   }
 
   return (
@@ -644,6 +721,11 @@ export default function CoachApp() {
               }
               onQuickLog={() => setActiveTab('log')}
               onAskCoach={() => setActiveTab('coach')}
+              setupProgress={setupProgress}
+              onContinueSetup={() => {
+                setSetupStartStep(setupProgress.nextStepIndex);
+                setShowSetup(true);
+              }}
             />
           )}
           {activeTab === 'log' && (
@@ -684,14 +766,20 @@ export default function CoachApp() {
 type OnboardingScreenProps = {
   profile: Profile;
   onComplete: (profile: Profile) => void;
+  initialStep?: number;
 };
 
-function OnboardingScreen({ profile, onComplete }: OnboardingScreenProps) {
+function OnboardingScreen({ profile, onComplete, initialStep = 0 }: OnboardingScreenProps) {
   const entrance = useEntrance();
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(initialStep);
   const [draft, setDraft] = useState(() => normalizeProfile(profile));
-  const totalSteps = 9;
+  const totalSteps = setupSteps.length;
   const lastStep = totalSteps - 1;
+
+  useEffect(() => {
+    const nextStep = Math.min(Math.max(initialStep, 0), totalSteps - 1);
+    setStep(nextStep);
+  }, [initialStep, totalSteps]);
 
   type IntakeField =
     | 'intakeA'
@@ -735,40 +823,9 @@ function OnboardingScreen({ profile, onComplete }: OnboardingScreenProps) {
     </View>
   );
 
-  const goodTimeFilled =
-    draft.positiveFactors.length > 0 || draft.goodTimeNote.trim().length > 0;
-  const hardTimeFilled =
-    draft.triggerFactors.length > 0 || draft.hardTimeNote.trim().length > 0;
-
-  const canNext = (() => {
-    switch (step) {
-      case 0:
-        return (
-          draft.childName.trim().length > 0 &&
-          draft.ageRange.length > 0 &&
-          draft.timeBudget.length > 0 &&
-          draft.caregiver.length > 0
-        );
-      case 1:
-        return draft.intakeA.length > 0;
-      case 2:
-        return draft.intakeB.length > 0;
-      case 3:
-        return draft.intakeC.length > 0;
-      case 4:
-        return draft.intakeD.length > 0;
-      case 5:
-        return draft.intakeE.length > 0;
-      case 6:
-        return draft.intakeF.length > 0;
-      case 7:
-        return goodTimeFilled && hardTimeFilled;
-      case 8:
-        return draft.concerns.length > 0;
-      default:
-        return false;
-    }
-  })();
+  const stepMeta = setupSteps[step];
+  const stepRequired = stepMeta?.required ?? false;
+  const canNext = stepRequired ? (stepMeta?.isComplete(draft) ?? false) : true;
 
   const handleNext = () => {
     if (step < lastStep) {
@@ -791,6 +848,14 @@ function OnboardingScreen({ profile, onComplete }: OnboardingScreenProps) {
                 style={[styles.progressDot, step === index && styles.progressDotActive]}
               />
             ))}
+          </View>
+          <View style={styles.stepMetaRow}>
+            <View style={[styles.stepMetaBadge, stepRequired ? styles.stepMetaBadgeRequired : styles.stepMetaBadgeOptional]}>
+              <Text style={styles.stepMetaBadgeText}>{stepRequired ? '必填' : '可跳过'}</Text>
+            </View>
+            <Text style={styles.stepMetaHint}>
+              {stepRequired ? '用于生成起始计划与日常任务' : '先开始使用，稍后再补齐也没问题'}
+            </Text>
           </View>
         </View>
 
@@ -998,11 +1063,18 @@ function OnboardingScreen({ profile, onComplete }: OnboardingScreenProps) {
             disabled={!canNext}
             testID="onboarding-next"
           />
-          {step > 0 ? (
-            <Pressable onPress={() => setStep(step - 1)} style={styles.backLink} testID="onboarding-back">
-              <Text style={styles.backLinkText}>返回上一步</Text>
-            </Pressable>
-          ) : null}
+          <View style={styles.footerLinks}>
+            {step > 0 ? (
+              <Pressable onPress={() => setStep(step - 1)} style={styles.backLink} testID="onboarding-back">
+                <Text style={styles.backLinkText}>返回上一步</Text>
+              </Pressable>
+            ) : null}
+            {!stepRequired && step < lastStep ? (
+              <Pressable onPress={handleNext} style={styles.skipLink} testID="onboarding-skip">
+                <Text style={styles.skipLinkText}>稍后再填</Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
       </Animated.View>
     </CoachScreen>
@@ -1016,13 +1088,25 @@ type TodayTabProps = {
   onToggleTask: (id: string) => void;
   onQuickLog: () => void;
   onAskCoach: () => void;
+  setupProgress: SetupProgress;
+  onContinueSetup: () => void;
 };
 
-function TodayTab({ profile, tasks, completedTasks, onToggleTask, onQuickLog, onAskCoach }: TodayTabProps) {
+function TodayTab({
+  profile,
+  tasks,
+  completedTasks,
+  onToggleTask,
+  onQuickLog,
+  onAskCoach,
+  setupProgress,
+  onContinueSetup,
+}: TodayTabProps) {
   const entrance = useEntrance(60);
   const taskAnimations = useStagger(tasks.length, 160);
   const timedTask = tasks.find((task) => task.durationSec);
   const timer = useCountdown(timedTask?.durationSec ?? 600);
+  const showSetupCard = setupProgress.percent < 100;
 
   return (
     <ScrollView
@@ -1037,6 +1121,23 @@ function TodayTab({ profile, tasks, completedTasks, onToggleTask, onQuickLog, on
           {profile.childName}（{profile.ageRange}）的起始计划已生成，别求完美，先求完成。
         </Text>
       </Animated.View>
+
+      {showSetupCard ? (
+        <Animated.View style={[entrance]}>
+          <Card style={styles.setupCard}>
+            <Text style={styles.setupTitle}>家庭画像已完成 {setupProgress.percent}%</Text>
+            <Text style={styles.setupHint}>
+              必填 {setupProgress.requiredDone}/{setupProgress.requiredTotal} · 选填 {setupProgress.optionalDone}/
+              {setupProgress.optionalTotal}
+            </Text>
+            <View style={styles.setupProgressTrack}>
+              <View style={[styles.setupProgressFill, { width: `${setupProgress.percent}%` }]} />
+            </View>
+            <Text style={styles.setupRemaining}>还有 {setupProgress.remainingCount} 项未完成，可随时补齐。</Text>
+            <CoachButton label="继续完善" onPress={onContinueSetup} />
+          </Card>
+        </Animated.View>
+      ) : null}
 
       {timedTask ? (
         <Animated.View style={[styles.timerCard, entrance]}>
@@ -1676,6 +1777,41 @@ const styles = StyleSheet.create({
     color: coachTheme.colors.textMuted,
     fontFamily: coachTheme.fonts.body,
   },
+  setupCard: {
+    backgroundColor: coachTheme.colors.surfaceCool,
+    borderRadius: coachTheme.radius.lg,
+    padding: coachTheme.spacing.md,
+    borderWidth: 1,
+    borderColor: coachTheme.colors.sage,
+    gap: coachTheme.spacing.sm,
+  },
+  setupTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: coachTheme.colors.textPrimary,
+    fontFamily: coachTheme.fonts.heading,
+  },
+  setupHint: {
+    fontSize: 12,
+    color: coachTheme.colors.textMuted,
+    fontFamily: coachTheme.fonts.body,
+  },
+  setupProgressTrack: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: coachTheme.colors.border,
+    overflow: 'hidden',
+  },
+  setupProgressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: coachTheme.colors.accent,
+  },
+  setupRemaining: {
+    fontSize: 12,
+    color: coachTheme.colors.textSecondary,
+    fontFamily: coachTheme.fonts.body,
+  },
   taskList: {
     gap: coachTheme.spacing.md,
   },
@@ -2111,6 +2247,37 @@ const styles = StyleSheet.create({
   progressDotActive: {
     backgroundColor: coachTheme.colors.accent,
   },
+  stepMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: coachTheme.spacing.sm,
+    marginTop: coachTheme.spacing.sm,
+  },
+  stepMetaBadge: {
+    paddingHorizontal: coachTheme.spacing.sm,
+    paddingVertical: 4,
+    borderRadius: coachTheme.radius.pill,
+  },
+  stepMetaBadgeRequired: {
+    backgroundColor: coachTheme.colors.accentSoft,
+  },
+  stepMetaBadgeOptional: {
+    backgroundColor: coachTheme.colors.surfaceCool,
+    borderWidth: 1,
+    borderColor: coachTheme.colors.sage,
+  },
+  stepMetaBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: coachTheme.colors.textPrimary,
+    fontFamily: coachTheme.fonts.body,
+  },
+  stepMetaHint: {
+    fontSize: 12,
+    color: coachTheme.colors.textMuted,
+    fontFamily: coachTheme.fonts.body,
+    flexShrink: 1,
+  },
   onboardingContent: {
     gap: coachTheme.spacing.lg,
     paddingBottom: coachTheme.spacing.lg,
@@ -2156,12 +2323,25 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
     gap: 8,
   },
+  footerLinks: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
   backLink: {
     alignSelf: 'center',
     paddingVertical: 4,
   },
   backLinkText: {
     color: coachTheme.colors.textSecondary,
+    fontSize: 12,
+    fontFamily: coachTheme.fonts.body,
+  },
+  skipLink: {
+    alignSelf: 'center',
+    paddingVertical: 4,
+  },
+  skipLinkText: {
+    color: coachTheme.colors.accentDeep,
     fontSize: 12,
     fontFamily: coachTheme.fonts.body,
   },
