@@ -25,14 +25,14 @@ export const concernOptions: Array<{ key: ConcernKey; label: string; hint: strin
 ];
 
 export const positiveFactorOptions = [
-  '眼神交流',
-  '听得到的夸奖',
-  '高质量时间',
-  '连贯的日程',
-  '倒计时',
-  '使用短句',
-  '两个选项',
-  '安静时间',
+  '先看着他再说话',
+  '当场说清楚他做对了什么',
+  '每天10分钟只陪他玩',
+  '今天安排提前说清楚',
+  '3-2-1 提醒要换任务',
+  '一次只说一件事',
+  '给两个可选项让他选',
+  '先去安静角冷静一下',
 ];
 
 export const triggerOptions = [

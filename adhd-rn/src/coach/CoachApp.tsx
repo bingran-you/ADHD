@@ -975,7 +975,8 @@ function OnboardingScreen({ profile, onComplete, initialStep = 0 }: OnboardingSc
                   multiline
                   testID="onboarding-good-note"
                 />
-                <Text style={styles.stepTitle}>积极因素（美好时光）</Text>
+                <Text style={styles.stepTitle}>当时有效的做法（可多选）</Text>
+                <Text style={styles.stepHint}>勾选你当时做了什么让情况更好。</Text>
                 <View style={styles.optionGrid}>
                   {positiveFactorOptions.map((option) => {
                     const selected = draft.positiveFactors.includes(option);
@@ -1609,7 +1610,7 @@ function ProfileTab({ profile }: ProfileTabProps) {
           <Text style={styles.profileValue}>{formatList(profile.intakeF)}</Text>
         </View>
         <View style={styles.profileRow}>
-          <Text style={styles.profileLabel}>积极因素</Text>
+          <Text style={styles.profileLabel}>有效做法</Text>
           <Text style={styles.profileValue}>{formatPlainList(profile.positiveFactors)}</Text>
         </View>
         <View style={styles.profileRow}>
