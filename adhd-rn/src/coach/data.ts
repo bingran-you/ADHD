@@ -37,13 +37,13 @@ export const positiveFactorOptions = [
 
 export const triggerOptions = [
   '饥饿',
-  '疲惫',
-  '情绪变化',
-  '日程安排改变',
-  '改变任务',
-  '和朋友玩太久',
-  '游戏太吵',
-  '觉得不公平',
+  '疲惫/困倦',
+  '无聊',
+  '过度刺激/噪音大',
+  '日程改变/计划变动',
+  '被打断/突然换任务',
+  '同伴/手足玩久后争抢',
+  '玩具被拿走/分配不公平',
 ];
 
 export const intakeAOptions: IntakeOption[] = [
