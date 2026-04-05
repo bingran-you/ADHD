@@ -75,5 +75,3 @@ Contains Keep and Traini design prototypes - numbered screen components (Keep_01
 - TypeScript with strict mode
 - expo-sqlite for local persistence
 - Detox for E2E testing (iOS only)
-
-FIRST-TREE-SOURCE-INTEGRATION: Use the installed `first-tree` skill here; keep all Context Tree files only in the sibling dedicated `ADHD-context` repo/submodule and update that tree when decisions or constraints change.
