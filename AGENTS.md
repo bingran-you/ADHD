@@ -22,3 +22,5 @@ End-to-end coverage currently uses Detox with Jest under `adhd-rn/e2e/`. Name ne
 
 ## Commit & Pull Request Guidelines
 Recent history favors short, action-first subjects such as `Polish wording`, `Update data.ts`, and `Fix end to end refactor issues`. Keep commits focused and use an imperative summary line. Pull requests should explain the user-facing change, list validation steps, link the relevant issue or product doc when applicable, and include screenshots or simulator captures for UI changes.
+
+FIRST-TREE-SOURCE-INTEGRATION: Use the installed `first-tree` skill here; keep all Context Tree files only in the sibling dedicated `ADHD-context` repo/submodule and update that tree when decisions or constraints change.
