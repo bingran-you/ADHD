@@ -1,3 +1,5 @@
 .DS_Store
 /tmp
 .vscode/settings.json
+.first-tree/local-tree.json
+.first-tree/tmp/
