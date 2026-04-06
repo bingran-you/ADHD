@@ -75,3 +75,22 @@ Contains Keep and Traini design prototypes - numbered screen components (Keep_01
 - TypeScript with strict mode
 - expo-sqlite for local persistence
 - Detox for E2E testing (iOS only)
+
+<!-- BEGIN FIRST-TREE-SOURCE-INTEGRATION -->
+FIRST-TREE-SOURCE-INTEGRATION: dedicated tree repo `ADHD-tree`
+FIRST-TREE-TREE-REPO-URL: `https://github.com/bingran-you/ADHD-tree.git`
+FIRST-TREE-LOCAL-TREE-CONFIG: `.first-tree/local-tree.json`
+
+This repo is a source/workspace repo. Keep all Context Tree files only in the dedicated `ADHD-tree` repo.
+
+Before every task:
+- Read `.first-tree/local-tree.json` first. If it exists, resolve its `localPath` value from this repo root and treat that checkout as the canonical local tree repo.
+- If that configured checkout exists locally, update it before you read anything else.
+- If the configured checkout is missing, clone a temporary working copy from `https://github.com/bingran-you/ADHD-tree.git` into `.first-tree/tmp/ADHD-tree/`, use it for the current task, and delete it before you finish.
+- Never commit `.first-tree/local-tree.json` or anything under `.first-tree/tmp/` to this repo. They are local-only workspace state.
+
+After every task:
+- Always ask whether the tree needs updating.
+- If the task changed decisions, constraints, rationale, or ownership, open a PR in the tree repo first. Then open the source/workspace code PR.
+- If the task changed only implementation details, skip the tree PR and open only the source/workspace code PR.
+<!-- END FIRST-TREE-SOURCE-INTEGRATION -->
