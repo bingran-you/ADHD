@@ -1,179 +1,139 @@
 ---
 name: first-tree
-description: Maintain the canonical `first-tree` skill and CLI distributed by the `first-tree` npm package. Use when modifying `first-tree` commands (`init`, `publish`, `verify`, `upgrade`, `help onboarding`), the installed skill payload under `assets/framework/`, maintainer references, or the build, packaging, test, and CI wiring that supports the framework.
+description: Read and update the Context Tree — the living source of truth for cross-domain decisions, constraints, and ownership in this organization. Use whenever a task touches strategic choices, cross-domain relationships, workspace-wide context, or Context Tree onboarding.
 ---
 
 # First Tree
 
-Use this skill when the task depends on the exact behavior of the
-`first-tree` CLI or the installed `.agents/skills/first-tree/` and
-`.claude/skills/first-tree/` payloads that `first-tree init` ships to user
-repos.
+This skill teaches you how to work with a repo's Context Tree and how to use
+the `first-tree` CLI for inspect, bind, init, verify, publish, and upgrade
+flows.
 
-## Source Of Truth
+## What Is Context Tree
 
-- `skills/first-tree/` is the only canonical copy.
-- `references/` holds the explanatory docs the skill should load on demand.
-- `assets/framework/` holds the runtime payload that gets installed into user
-  repos.
-- `engine/` holds the canonical framework and CLI behavior.
-- `scripts/` holds maintenance helpers for validating and running the skill.
-- In maintainer docs, use `first-tree` for the CLI, `skills/first-tree/` for
-  the bundled source path, and `.agents/skills/first-tree/` /
-  `.claude/skills/first-tree/` for installed user-repo paths.
+A Context Tree is a git-native, file-based knowledge base that captures **why**
+decisions were made and **how** domains relate, not how things are executed.
+Each domain is a directory containing a `NODE.md`. Each leaf decision is a
+markdown file with frontmatter declaring `title`, `owners`, and optional
+`soft_links` to related nodes.
 
-## When To Read What
+Read `references/about.md` for the product framing and
+`references/principles.md` for the four core principles you must follow when
+reading or writing nodes.
 
-1. Start with `references/source-map.md` to locate the right files.
-2. Read the user-facing reference that matches the task:
-   - `references/onboarding.md`
-   - `references/about.md`
-   - `references/source-workspace-installation.md`
-   - `references/principles.md`
-   - `references/ownership-and-naming.md`
-   - `references/upgrade-contract.md`
-3. Read the maintainer reference that matches the shell or validation surface:
-   - `references/maintainer-architecture.md`
-   - `references/maintainer-thin-cli.md`
-   - `references/maintainer-build-and-distribution.md`
-   - `references/maintainer-testing.md`
-4. Open `engine/` when changing `init`, `verify`, `upgrade`, command routing,
-   repo inspection, rules, runtime helpers, or validators.
-5. Open `assets/framework/` only when the task changes shipped templates,
-   workflows, prompts, examples, or helper scripts.
-6. Open `tests/` when changing validation coverage or maintainer workflows.
-7. Use `./scripts/run-local-cli.sh <command>` when you need to exercise the
-   live CLI from this repo.
+## When To Use This Skill
 
-## Working Modes
+Trigger this skill when you are asked to:
 
-### Maintaining `first-tree`
+- Read or update any `NODE.md` or leaf node in the tree
+- Make a decision that affects multiple domains or repos
+- Check ownership before editing a node
+- Onboard a new repo, shared tree, or workspace root
+- Run `first-tree` CLI commands
+- Investigate why a particular decision was made
 
-- Treat this repo as the distribution source for one canonical skill plus a
-  thin CLI shell, not as a tree repo.
-- Keep command behavior, validator behavior, shipped assets, maintainer
-  references, and package shell aligned.
-- If root README/AGENTS/CI text explains something non-obvious, migrate that
-  information into `references/` and trim the root file back down.
-- If you change runtime assets or skill references, run `pnpm validate:skill`.
+Do **not** use this skill for routine code edits that do not touch decisions,
+constraints, ownership, or cross-domain relationships.
 
-### Working In A User Tree Repo
+## Before Every Task
 
-- When the task is to "install and use first-tree" in an existing
-  source/workspace repo, start with
-  `references/source-workspace-installation.md` and follow that workflow
-  end-to-end before improvising.
-- When a user asks to install first-tree for an existing source/workspace repo,
-  the current repo keeps only the installed skill plus a
-  managed `FIRST-TREE-SOURCE-INTEGRATION:` section in `AGENTS.md` and
-  `CLAUDE.md`, plus `FIRST_TREE.md`. Do not create `NODE.md`, `members/`, or
-  tree-scoped `AGENTS.md` / `CLAUDE.md` there.
-- `first-tree init` defaults to creating or reusing a sibling dedicated tree
-  repo when invoked from a source/workspace repo. It installs the bundled skill
-  into the source/workspace repo, links `FIRST_TREE.md` to
-  `.agents/skills/first-tree/references/about.md` there, and scaffolds tree
-  files only in the dedicated tree repo. Use `--here` to initialize the current
-  repo in place when you are already inside the tree repo.
-- `first-tree publish --open-pr` is the default second-stage command after
-  `init` for source/workspace installs. Run it from the dedicated tree repo
-  once the initial tree version is ready to push.
-- Never run `first-tree init --here` in a source/workspace repo unless the
-  user explicitly wants that repo itself to become the dedicated Context Tree.
-  `--here` is for when you have already switched into the `*-tree` repo (or an
-  older dedicated `*-context` repo).
-- `first-tree init --seed-members contributors` is an explicit bootstrap aid:
-  it seeds `members/*/NODE.md` from GitHub contributors when available, and
-  falls back to local git history when GitHub metadata is unavailable.
-- `first-tree init` does not install this skill into the target tree repo.
-  Dedicated tree repos keep `.first-tree/` metadata plus `NODE.md`,
-  `AGENTS.md`, `CLAUDE.md`, and `members/NODE.md`.
-- The default source/workspace workflow is: run `first-tree init` from the
-  source repo, draft the first tree version in `<repo>-tree`, then run
-  `first-tree publish --open-pr` from that dedicated tree repo. If the source
-  repo is already bound to a legacy `<repo>-context`, keep reusing that repo
-  name instead of renaming it.
-- After the initial scaffold is in place, treat `progress.md` as the source of
-  truth for onboarding status. Before deep tree population, report
-  setup/integration progress separately from tree-content baseline coverage,
-  ask the user whether to continue, and if they confirm, expand the tree with
-  wave-based parallel sub-tasks or subagents by top-level domain.
-- After `first-tree publish` succeeds, treat the checkout recorded in the
-  source/workspace repo's `.first-tree/local-tree.json` file as the canonical
-  local working copy for the tree. The bootstrap checkout can be deleted when
-  you no longer need it.
-- For day-to-day tasks after publish, read `.first-tree/local-tree.json`
-  first, update the recorded checkout, and use that copy for routine work. If
-  the recorded checkout is missing, use the published tree repo URL from the
-  managed `FIRST-TREE-SOURCE-INTEGRATION:` section to create a temporary clone
-  under `.first-tree/tmp/` inside the active source/workspace repo, then
-  delete that temporary clone before finishing the task. Fall back to the
-  sibling bootstrap checkout only before publish has recorded the GitHub URL.
-- At task close-out, always ask whether the tree needs updating. If the task
-  changed decisions, constraints, rationale, or ownership, send the tree PR
-  first and then send the source/workspace code PR. If the task changed only
-  implementation detail, skip the tree PR and send only the source/workspace
-  code PR.
-- If the dedicated tree repo was initialized manually with `first-tree init --here`
-  and does not have bootstrap metadata yet, pass `--source-repo PATH` to
-  `first-tree publish`.
-- If permissions, auth, or local filesystem constraints block the dedicated
-  repo workflow, stop and report the blocker. Do not fall back to in-place tree
-  bootstrap in the source/workspace repo.
-- `first-tree upgrade` refreshes the installed skill from the copy bundled
-  with the currently running `first-tree` package. In a source/workspace repo
-  it refreshes only the local skill, the `FIRST_TREE.md` symlink, plus the
-  `FIRST-TREE-SOURCE-INTEGRATION:` section; upgrade the dedicated tree repo
-  separately with `--tree-path`. Dedicated tree repos refresh only
-  `.first-tree/`. To pick up a newer framework, run a newer package version
-  first. It also migrates older repos that still use `skills/first-tree/`.
-- The user's tree content lives outside the skill; the skill only carries the
-  reusable framework payload plus maintenance guidance.
-- The tree still stores decisions, constraints, and ownership; execution detail
-  stays in source systems.
+1. Read the root `NODE.md`.
+2. Read the `NODE.md` of every relevant domain.
+3. Follow `soft_links`.
+4. Read the leaf nodes that match your task.
 
-## Non-Negotiables
+Skipping this step produces decisions that conflict with existing ones.
 
-- Preserve the CLI contract that it scaffolds, prints task lists, and validates
-  state; it does not fully automate tree maintenance.
-- Keep shipped assets generic. They must not contain org-specific content.
-- Keep decision knowledge in the tree and execution detail in source systems.
-- Keep the skill as the only canonical knowledge source. The root CLI/package
-  shell must not become a second source of framework semantics.
-- Keep the CLI name written as `first-tree` in maintainer and user-facing
-  docs so command examples stay aligned with the published package.
-- Keep normal `init` / `upgrade` flows self-contained. They must work from the
-  skill bundled in the current package without cloning the source repo or
-  relying on network access.
-- Make upgrade behavior explicit. If you change installed paths, update
-  `references/upgrade-contract.md`, task text, and tests together.
+## During The Task
 
-## Validation
+- Decide in the tree, execute in source systems.
+- Keep execution detail out of the tree.
+- Respect ownership. See `references/ownership-and-naming.md`.
 
-- Repo checks: `pnpm typecheck`, `pnpm test`, `pnpm build`
-- Packaging check: `pnpm pack` when changing package contents or install/upgrade
-  behavior
-- Skill checks:
-  - `pnpm validate:skill`
-  - `python3 ./skills/first-tree/scripts/quick_validate.py ./skills/first-tree`
-  - `bash ./skills/first-tree/scripts/check-skill-sync.sh`
+## After Every Task
 
-## Key Files
+Always ask: **does the tree need updating?**
 
-- `assets/framework/manifest.json`: runtime asset contract
-- `assets/framework/templates/`: generated scaffolds
-- `assets/framework/workflows/`: CI templates
-- `assets/framework/helpers/`: shipped helper scripts and review tooling
-- `assets/framework/helpers/summarize-progress.js`: optional onboarding
-  checkpoint helper for turning `progress.md` into a setup-vs-tree summary
-- `engine/`: canonical framework and CLI behavior
-- `tests/`: canonical unit and structure validation
-- `references/source-map.md`: canonical reading index
-- `references/source-workspace-installation.md`: source/workspace install
-  contract
-- `references/maintainer-architecture.md`: source-repo architecture and
-  invariants
-- `references/maintainer-thin-cli.md`: root shell contract
-- `references/maintainer-build-and-distribution.md`: packaging and release
-  guidance
-- `references/maintainer-testing.md`: validation workflow
-- `references/upgrade-contract.md`: installed layout and upgrade semantics
+- Did the task change decisions, constraints, ownership, or workspace-level relationships?
+- Did you discover something the tree failed to capture?
+- Did you find outdated tree content?
+
+## CLI Workflow
+
+The CLI now centers on three concepts:
+
+- `source/workspace root`
+- `tree repo`
+- `binding`
+
+Default onboarding workflow:
+
+1. Run `first-tree inspect --json`.
+2. Ask whether the user already has a Context Tree.
+3. If they do, use `first-tree bind`.
+4. If they do not, use `first-tree init`.
+5. If the current root is a workspace, run `first-tree workspace sync` so all
+   child repos bind to the same shared tree.
+
+During `bind` / `init`, the CLI also ensures the tree repo has the bundled
+`first-tree` skill installed and refreshes binding metadata in both locations.
+
+## CLI Commands
+
+| Command | Purpose |
+|---|---|
+| `first-tree inspect` | Classify the current folder and report bindings / child repos |
+| `first-tree init` | High-level onboarding wrapper for single repos, shared trees, and workspace roots |
+| `first-tree init tree` | Low-level tree bootstrap for an explicit tree checkout |
+| `first-tree bind` | Bind the current repo/workspace root to an existing tree repo |
+| `first-tree workspace sync` | Bind child repos to the same shared tree |
+| `first-tree verify` | Validate a tree repo: frontmatter, owners, soft_links, members, progress |
+| `first-tree upgrade` | Refresh the installed skill or tree metadata from the bundled package |
+| `first-tree publish` | Publish a tree repo to GitHub and refresh locally bound source/workspace repos |
+| `first-tree review` | CI helper: run Claude Code PR review against tree changes |
+| `first-tree generate-codeowners` | Regenerate `.github/CODEOWNERS` from tree ownership |
+| `first-tree inject-context` | Output a Claude Code SessionStart hook payload from `NODE.md` |
+| `first-tree help onboarding` | Show the onboarding narrative |
+
+For full options, run `first-tree <command> --help`.
+
+## Installing And Updating The CLI
+
+Recommended invocation:
+
+```bash
+npx -p first-tree first-tree <command>
+```
+
+This always runs the latest published version. The CLI auto-checks for
+updates on every invocation; pass `--skip-version-check` to suppress the
+check for latency-sensitive callers like SessionStart hooks.
+
+To refresh the bundled skill payload when a new minor version is released:
+
+```bash
+npx -p first-tree first-tree upgrade
+```
+
+## Ownership And Editing
+
+- Every directory has a `NODE.md` declaring `owners` in its frontmatter.
+- Empty `owners: []` inherits from the parent.
+- `owners: [*]` means anyone may edit.
+- Otherwise only the listed owners may approve changes.
+
+See `references/ownership-and-naming.md`.
+
+## Files In This Skill
+
+- `SKILL.md` — this file
+- `VERSION` — installed skill payload version
+- `references/about.md` — what Context Tree is, who it is for, why it exists
+- `references/principles.md` — four core principles with examples
+- `references/ownership-and-naming.md` — node naming and ownership model
+- `references/onboarding.md` — onboarding narrative for repos, shared trees, and workspaces
+- `references/source-workspace-installation.md` — source/workspace binding contract
+- `references/upgrade-contract.md` — installed layout and upgrade semantics
+
+Everything else lives in the `first-tree` npm package and is invoked via the
+CLI.
