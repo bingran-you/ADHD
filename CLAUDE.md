@@ -77,8 +77,12 @@ Contains Keep and Traini design prototypes - numbered screen components (Keep_01
 - Detox for E2E testing (iOS only)
 
 <!-- BEGIN FIRST-TREE-SOURCE-INTEGRATION -->
-FIRST-TREE-SOURCE-INTEGRATION: dedicated tree repo `ADHD-tree`
+FIRST-TREE-SOURCE-INTEGRATION: source repo bound to dedicated tree repo `ADHD-tree`
+FIRST-TREE-TREE-REPO: `ADHD-tree`
+FIRST-TREE-TREE-MODE: `dedicated`
+FIRST-TREE-BINDING-MODE: `standalone-source`
 FIRST-TREE-TREE-REPO-URL: `https://github.com/bingran-you/ADHD-tree.git`
+FIRST-TREE-ENTRYPOINT: `/`
 FIRST-TREE-LOCAL-TREE-CONFIG: `.first-tree/local-tree.json`
 
 This repo is a source/workspace repo. Keep all Context Tree files only in the dedicated `ADHD-tree` repo.
@@ -91,6 +95,6 @@ Before every task:
 
 After every task:
 - Always ask whether the tree needs updating.
-- If the task changed decisions, constraints, rationale, or ownership, open a PR in the tree repo first. Then open the source/workspace code PR.
+- If the task changed decisions, constraints, rationale, ownership, or shared workspace relationships, open a PR in the tree repo first. Then open the source/workspace code PR.
 - If the task changed only implementation details, skip the tree PR and open only the source/workspace code PR.
 <!-- END FIRST-TREE-SOURCE-INTEGRATION -->

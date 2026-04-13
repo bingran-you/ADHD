@@ -5,101 +5,108 @@ owners: []
 
 # Source/Workspace Installation Contract
 
-This reference defines what it means to "install and use first-tree" in an
-existing source or workspace repository.
+This reference defines what it means to install `first-tree` in a source repo,
+workspace repo, or non-git workspace folder.
 
 ## Core Boundary
 
-- The current source/workspace repo is **not** the Context Tree.
-- The current source/workspace repo should carry only the installed
-  `.agents/skills/first-tree/` and `.claude/skills/first-tree/` skill roots
-  plus a `FIRST_TREE.md` symlink to
-  `.agents/skills/first-tree/references/about.md` and a managed
-  `FIRST-TREE-SOURCE-INTEGRATION:` section in root `AGENTS.md` and `CLAUDE.md`.
-- `NODE.md`, `members/`, and tree-scoped `AGENTS.md` / `CLAUDE.md` content
-  belong only in a dedicated `*-tree` repo. Existing bound `*-context` repos
-  are still supported and should be reused.
-- The dedicated tree repo keeps its local CLI metadata under `.first-tree/`
-  instead of installing another copy of the `first-tree` skill.
-- If a task changes decisions, rationale, ownership, or constraints, update
-  the dedicated tree repo rather than copying that material into the source
-  repo.
+- The current source/workspace root is **not** the Context Tree.
+- The current source/workspace root carries only:
+  - `.agents/skills/first-tree/` and `.claude/skills/first-tree/`
+  - `FIRST_TREE.md`
+  - a managed `FIRST-TREE-SOURCE-INTEGRATION:` block in `AGENTS.md` and `CLAUDE.md`
+  - `.first-tree/local-tree.json`
+  - `.first-tree/source.json`
+  - `.first-tree/workspace.json` when the root is a workspace
+- `NODE.md`, `members/`, and tree-scoped `AGENTS.md` / `CLAUDE.md` belong only
+  in the tree repo.
+- The tree repo keeps its own installed skill under `.agents/skills/first-tree/`
+  and `.claude/skills/first-tree`, plus tree metadata under `.first-tree/tree.json`
+  and `.first-tree/bindings/`.
+
+## Binding Modes
+
+`first-tree` currently writes one of four binding modes:
+
+- `standalone-source` — a single repo bound to its own dedicated `<repo>-tree`
+- `shared-source` — a single repo bound to an existing shared tree
+- `workspace-root` — the current root is a whole workspace
+- `workspace-member` — a child repo bound to the workspace's shared tree
+
+## What Lives Where
+
+```text
+<source-or-workspace-root>/
+  .agents/skills/first-tree/
+  .claude/skills/first-tree
+  FIRST_TREE.md
+  AGENTS.md
+  CLAUDE.md
+  .first-tree/
+    local-tree.json
+    source.json
+    workspace.json          # workspace roots only
+
+<tree-repo>/
+  .agents/skills/first-tree/
+  .claude/skills/first-tree
+  .first-tree/
+    VERSION
+    progress.md
+    tree.json
+    bindings/
+      <source-id>.json
+    bootstrap.json          # legacy compatibility
+  NODE.md
+  AGENTS.md
+  CLAUDE.md
+  members/
+    NODE.md
+```
 
 ## Agent Decision Rule
 
-- Treat "install and use first-tree" in a source/workspace repo as a two-repo
-  workflow: local integration in the current repo plus tree bootstrap in a
-  sibling `*-tree` repo.
-- If the source/workspace repo is already bound to a legacy `*-context` repo,
-  keep reusing that repo name instead of silently switching it to `*-tree`.
-- Do not run `first-tree init --here` in the source/workspace repo unless the
-  user explicitly says that repo itself should become the Context Tree.
-- If you cannot create the sibling repo locally, cannot push it to GitHub, or
-  cannot record or refresh the local tree checkout state yet, pause and report
-  the blocker. Do not fall back to creating `NODE.md`, `members/`, or
-  tree-scoped `AGENTS.md` / `CLAUDE.md` in the source/workspace repo.
+When an agent is asked to install `first-tree`:
 
-## Default Agent Workflow
+1. Run `first-tree inspect --json`.
+2. Ask whether an existing Context Tree already exists.
+3. If yes, prefer `first-tree bind`.
+4. If no, use `first-tree init`.
+5. If the current root is a workspace, follow with `first-tree workspace sync`.
 
-When an agent is asked to install first-tree for a source/workspace repo, the
-default workflow is:
+Do not recreate a new sibling tree repo when the user already has a shared tree
+they want to keep using.
 
-1. Run `first-tree init` from the current source/workspace repo.
-   You may add `--seed-members contributors` to draft initial
-   `members/*/NODE.md` files from repository contributor history during the
-   bootstrap.
-2. Switch into the sibling dedicated tree repo named `<repo>-tree` by default.
-   If the source/workspace repo is already bound to `<repo>-context`, switch
-   into that existing repo instead.
-3. Draft the first tree version from the real codebase, docs, and ownership
-   signals.
-4. Read `.first-tree/progress.md` as the source of truth for the
-   onboarding checkpoint, report setup/integration progress separately from
-   tree-content baseline coverage, and ask whether to continue the first-pass
-   full-tree expansion.
-5. If the user confirms, expand the tree with wave-based parallel sub-tasks or
-   subagents, usually one per top-level domain, while the main agent keeps
-   ownership of the root `NODE.md`, cross-domain `soft_links`, and the final
-   `first-tree verify` pass.
-6. Run `first-tree publish --open-pr` from the dedicated tree repo. It will:
-   create or reuse the GitHub `*-tree` repo in the same owner/org as the
-   source repo, continue supporting older `*-context` repos, push the tree,
-   record the published tree URL back in the source/workspace repo, refresh the
-   ignored local tree checkout config, and open the source-repo PR.
-7. After publish succeeds, treat the checkout recorded in
-   `.first-tree/local-tree.json` as the canonical local working copy for the
-   tree. The bootstrap checkout can be deleted when you no longer need it.
+Whenever a git-backed source/workspace root is bound, keep the binding metadata
+pointing at the tree checkout and published tree URL. Do not create hidden
+codebase mirrors in the tree repo by default.
 
-If the dedicated tree repo was initialized manually with `first-tree init --here`
-and publish cannot infer the source repo, pass `--source-repo PATH`.
+## Workspace Rule
 
-## Routine Work After Publish
+If the current root contains many child repos or submodules:
 
-- Start routine work by reading `.first-tree/local-tree.json` in the current
-  source/workspace repo and resolving the recorded `localPath`.
-- If that recorded checkout exists locally, update it before you read the
-  tree.
-- If the recorded checkout is missing but the tree has already been published,
-  create a temporary clone inside `.first-tree/tmp/` in the current
-  source/workspace repo, use it for the task, and delete it before finishing.
-- Fall back to the sibling bootstrap checkout (`*-tree` by default, or legacy
-  `*-context`) only before publish has recorded the GitHub URL and local tree
-  config.
-- At task close-out, always ask whether the tree needs updating.
-- If the task changed decisions, constraints, rationale, or ownership, send
-  the tree PR first and then send the source/workspace code PR.
-- If the task changed only implementation detail, skip the tree PR and send
-  only the source/workspace code PR.
+- the workspace root should get local first-tree integration
+- all child repos should bind to the same shared tree
+- child repos should not each create their own separate tree repos
+
+Only real child git repos / submodules should be synced automatically. Plain
+package folders that are not repos do not get repo-level binding metadata.
 
 ## Verification And Upgrade
 
-- Do not run `first-tree verify` in the source/workspace repo. Verify the
-  dedicated tree repo instead, for example
-  `first-tree verify --tree-path ../my-repo-tree`.
-- Running `first-tree upgrade` in the source/workspace repo refreshes only
-  the local installed skill, the `FIRST_TREE.md` symlink, and the
-  `FIRST-TREE-SOURCE-INTEGRATION:` section.
-- Run `first-tree upgrade --tree-path ../my-repo-tree` to upgrade the
-  dedicated tree repo itself. If the source/workspace repo is still bound to
-  `../my-repo-context`, use that actual legacy path instead. Dedicated tree
-  repos keep their progress and version markers under `.first-tree/`.
+- Verify the tree repo with `first-tree verify`.
+- Use `first-tree upgrade` in a source/workspace root to refresh local
+  integration.
+- Use `first-tree upgrade --tree-path ...` to refresh the tree repo metadata
+  plus its installed tree-repo skill.
+
+## Publish Rule
+
+`first-tree publish` is tree-centric:
+
+- it publishes the tree repo
+- it refreshes locally bound source/workspace repos with the published tree URL
+- it opens a code PR only when exactly one source/workspace repo is being refreshed
+
+That keeps shared trees workable for multi-repo workspaces without forcing
+`publish` back into a one-source-only model.
